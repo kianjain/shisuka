@@ -69,28 +69,28 @@ struct ContentView: View {
         TabView(selection: $selectedTab) {
             HomeView(selectedTab: $selectedTab)
                 .tabItem {
-                    Image(systemName: "rectangle.grid.1x2")
+                    Image(systemName: "house.fill")
                     Text("Home")
                 }
                 .tag(0)
             
             UploadView()
                 .tabItem {
-                    Image(systemName: "arrow.up.circle")
+                    Image(systemName: "square.and.arrow.up.fill")
                     Text("Upload")
                 }
                 .tag(1)
             
             ReviewView()
                 .tabItem {
-                    Image(systemName: "bubble.left.fill")
+                    Image(systemName: "message.fill")
                     Text("Review")
                 }
                 .tag(2)
             
             LibraryView()
                 .tabItem {
-                    Image(systemName: "folder.fill")
+                    Image(systemName: "square.grid.2x2.fill")
                     Text("Library")
                 }
                 .tag(3)

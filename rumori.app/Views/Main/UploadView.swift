@@ -161,7 +161,7 @@ struct UploadView: View {
                     Button(action: {
                         showingProfile = true
                     }) {
-                        Image(systemName: "person.circle.fill")
+                        Image(systemName: "person.crop.circle.fill")
                             .foregroundColor(.white)
                     }
                 }
@@ -171,14 +171,14 @@ struct UploadView: View {
                         Button(action: {
                             showingSettings = true
                         }) {
-                            Image(systemName: "gearshape.fill")
+                            Image(systemName: "gearshape.2.fill")
                                 .foregroundColor(.white)
                         }
                         
                         Button(action: {
                             showingNotifications = true
                         }) {
-                            Image(systemName: "bell.fill")
+                            Image(systemName: "bell.badge.fill")
                                 .foregroundColor(.white)
                         }
                     }

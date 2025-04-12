@@ -666,7 +666,7 @@ struct HomeView: View {
                     Button(action: {
                         showingProfile = true
                     }) {
-                        Image(systemName: "person.circle.fill")
+                        Image(systemName: "person.crop.circle.fill")
                             .foregroundColor(.white)
                     }
                 }
@@ -676,14 +676,14 @@ struct HomeView: View {
                         Button(action: {
                             showingSettings = true
                         }) {
-                            Image(systemName: "gearshape.fill")
+                            Image(systemName: "gear")
                                 .foregroundColor(.white)
                         }
                         
                         Button(action: {
                             showingNotifications = true
                         }) {
-                            Image(systemName: "bell.fill")
+                            Image(systemName: "bell.badge.fill")
                                 .foregroundColor(.white)
                         }
                     }

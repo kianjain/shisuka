@@ -71,37 +71,53 @@ struct ProfileView: View {
                         }
                         .padding()
                         
-                        // Recent Activity
+                        // Favorites Section
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Recent Activity")
-                                .font(.title3)
-                                .bold()
-                                .foregroundColor(.white)
-                                .padding(.horizontal)
-                            
-                            ForEach(0..<5) { _ in
-                                HStack(spacing: 16) {
-                                    Circle()
-                                        .fill(Color.gray.opacity(0.3))
-                                        .frame(width: 40, height: 40)
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("Reviewed a project")
-                                            .font(.subheadline)
-                                            .foregroundColor(.white)
-                                        
-                                        Text("2 hours ago")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                    }
-                                    
-                                    Spacer()
-                                }
-                                .padding()
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(12)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("Favorites")
+                                    .font(.title3)
+                                    .bold()
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                                
+                                Text("View All")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
                             }
+                            .padding(.horizontal)
+                            
+                            // Favorites Grid
+                            LazyVGrid(columns: [
+                                GridItem(.flexible(), spacing: 16),
+                                GridItem(.flexible(), spacing: 16)
+                            ], spacing: 16) {
+                                ForEach(0..<6) { _ in
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        // Favorite Item Image
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color.gray.opacity(0.3))
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .overlay(
+                                                Image(systemName: "photo.on.rectangle.angled")
+                                                    .font(.system(size: 32))
+                                                    .foregroundColor(.white.opacity(0.7))
+                                            )
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Project Title")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white)
+                                                .lineLimit(1)
+                                            
+                                            Text("Category")
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
                         }
                     }
                     .padding(.vertical)
