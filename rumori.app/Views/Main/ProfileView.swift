@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var auth = AuthService.shared
     
     var body: some View {
         NavigationStack {
@@ -19,19 +20,41 @@ struct ProfileView: View {
                                 .fill(Color.gray.opacity(0.3))
                                 .frame(width: 100, height: 100)
                                 .overlay(
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.white)
+                                    Group {
+                                        if let avatarUrl = auth.currentProfile?.avatarUrl {
+                                            AsyncImage(url: URL(string: avatarUrl)) { image in
+                                                image
+                                                    .resizable()
+                                                    .scaledToFill()
+                                            } placeholder: {
+                                                Image(systemName: "person.fill")
+                                                    .font(.system(size: 40))
+                                                    .foregroundColor(.white)
+                                            }
+                                        } else {
+                                            Image(systemName: "person.fill")
+                                                .font(.system(size: 40))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
                                 )
+                                .clipShape(Circle())
                             
                             // User Info
                             VStack(spacing: 4) {
-                                Text("John Doe")
-                                    .font(.title2)
-                                    .bold()
-                                    .foregroundColor(.white)
+                                if let username = auth.currentProfile?.username {
+                                    Text(username)
+                                        .font(.title2)
+                                        .bold()
+                                        .foregroundColor(.white)
+                                } else {
+                                    Text("Anonymous")
+                                        .font(.title2)
+                                        .bold()
+                                        .foregroundColor(.white)
+                                }
                                 
-                                Text("@johndoe")
+                                Text(auth.currentUser?.email ?? "")
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
                             }

@@ -5,6 +5,8 @@ struct SettingsView: View {
     @AppStorage("isDarkMode") private var isDarkMode = true
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @AppStorage("autoPlayEnabled") private var autoPlayEnabled = false
+    @StateObject private var auth = AuthService.shared
+    @State private var showingSignOutAlert = false
     
     var body: some View {
         NavigationStack {
@@ -86,6 +88,16 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .alert("Sign Out", isPresented: $showingSignOutAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Sign Out", role: .destructive) {
+                    Task {
+                        try? await auth.signOut()
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to sign out?")
+            }
         }
     }
     
@@ -93,7 +105,10 @@ struct SettingsView: View {
         SettingItem(title: "Edit Profile", icon: "person.fill", action: {}),
         SettingItem(title: "Privacy", icon: "lock.fill", action: {}),
         SettingItem(title: "Security", icon: "shield.fill", action: {}),
-        SettingItem(title: "Payment Methods", icon: "creditcard.fill", action: {})
+        SettingItem(title: "Payment Methods", icon: "creditcard.fill", action: {}),
+        SettingItem(title: "Sign Out", icon: "rectangle.portrait.and.arrow.right", action: {
+            // This will be handled by the alert
+        })
     ]
     
     private let supportSettings = [
@@ -112,28 +127,47 @@ struct SettingItem {
 
 struct SettingRow: View {
     let setting: SettingItem
+    @State private var showingSignOutAlert = false
     
     var body: some View {
-        Button(action: setting.action) {
+        Button(action: {
+            if setting.title == "Sign Out" {
+                showingSignOutAlert = true
+            } else {
+                setting.action()
+            }
+        }) {
             HStack {
                 Image(systemName: setting.icon)
                     .font(.system(size: 20))
-                    .foregroundColor(.white)
+                    .foregroundColor(setting.title == "Sign Out" ? .red : .white)
                     .frame(width: 30)
                 
                 Text(setting.title)
-                    .foregroundColor(.white)
+                    .foregroundColor(setting.title == "Sign Out" ? .red : .white)
                 
                 Spacer()
                 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundColor(.gray)
+                if setting.title != "Sign Out" {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                }
             }
             .padding()
             .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
             .padding(.horizontal)
+        }
+        .alert("Sign Out", isPresented: $showingSignOutAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Sign Out", role: .destructive) {
+                Task {
+                    try? await AuthService.shared.signOut()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to sign out?")
         }
     }
 }

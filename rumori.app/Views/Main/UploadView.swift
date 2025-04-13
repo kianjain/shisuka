@@ -171,7 +171,7 @@ struct UploadView: View {
                         Button(action: {
                             showingSettings = true
                         }) {
-                            Image(systemName: "gearshape.2.fill")
+                            Image(systemName: "gear")
                                 .foregroundColor(.white)
                         }
                         

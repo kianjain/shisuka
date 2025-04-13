@@ -9,14 +9,25 @@ import SwiftUI
 
 @main
 struct rumori_appApp: App {
+    @StateObject private var auth = AuthService.shared
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .preferredColorScheme(.dark) // Force dark mode
-                .onAppear {
-                    // Set up any initial app configuration here
-                    setupAppearance()
+            Group {
+                if auth.isLoading {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                } else if auth.isAuthenticated {
+                    ContentView()
+                } else {
+                    SignInView()
                 }
+            }
+            .preferredColorScheme(.dark) // Force dark mode
+            .onAppear {
+                // Set up any initial app configuration here
+                setupAppearance()
+            }
         }
     }
     
