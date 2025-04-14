@@ -1,8 +1,42 @@
 import SwiftUI
+import PhotosUI
+import Supabase
 
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var auth = AuthService.shared
+    @State private var showingImagePicker = false
+    @State private var selectedImage: PhotosPickerItem?
+    @State private var isEditingUsername = false
+    @State private var newUsername = ""
+    @FocusState private var isUsernameFocused: Bool
+    
+    private func uploadProfileImage(_ item: PhotosPickerItem) async {
+        do {
+            // Get the image data
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                print("❌ [Profile] Failed to load image data")
+                return
+            }
+            
+            // Upload the image using AuthService
+            try await auth.uploadProfileImage(data)
+            
+        } catch {
+            print("❌ [Profile] Error uploading profile image: \(error)")
+        }
+    }
+    
+    private func updateUsername() async {
+        guard !newUsername.isEmpty else { return }
+        do {
+            try await auth.updateUsername(newUsername)
+            isEditingUsername = false
+            isUsernameFocused = false
+        } catch {
+            print("❌ [Profile] Error updating username: \(error)")
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -14,44 +48,55 @@ struct ProfileView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         // Profile Header
-                        VStack(spacing: 16) {
-                            // Profile Image
-                            Circle()
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 100, height: 100)
-                                .overlay(
-                                    Group {
-                                        if let avatarUrl = auth.currentProfile?.avatarUrl {
-                                            AsyncImage(url: URL(string: avatarUrl)) { image in
-                                                image
-                                                    .resizable()
-                                                    .scaledToFill()
-                                            } placeholder: {
-                                                Image(systemName: "person.fill")
-                                                    .font(.system(size: 40))
-                                                    .foregroundColor(.white)
-                                            }
-                                        } else {
-                                            Image(systemName: "person.fill")
-                                                .font(.system(size: 40))
-                                                .foregroundColor(.white)
-                                        }
-                                    }
-                                )
-                                .clipShape(Circle())
+                        VStack(spacing: 24) {
+                            // Profile Image with Picker
+                            PhotosPicker(selection: $selectedImage, matching: .images) {
+                                ProfilePicture(size: 100, action: nil)
+                            }
+                            .task(id: selectedImage) {
+                                if let image = selectedImage {
+                                    await uploadProfileImage(image)
+                                }
+                            }
                             
                             // User Info
                             VStack(spacing: 4) {
-                                if let username = auth.currentProfile?.username {
-                                    Text(username)
+                                if isEditingUsername {
+                                    TextField("Username", text: $newUsername)
                                         .font(.title2)
                                         .bold()
                                         .foregroundColor(.white)
+                                        .multilineTextAlignment(.center)
+                                        .focused($isUsernameFocused)
+                                        .submitLabel(.done)
+                                        .onSubmit {
+                                            Task {
+                                                await updateUsername()
+                                            }
+                                        }
+                                        .onAppear {
+                                            isUsernameFocused = true
+                                        }
                                 } else {
-                                    Text("Anonymous")
-                                        .font(.title2)
-                                        .bold()
-                                        .foregroundColor(.white)
+                                    if let username = auth.currentProfile?.username {
+                                        Text(username)
+                                            .font(.title2)
+                                            .bold()
+                                            .foregroundColor(.white)
+                                            .onTapGesture {
+                                                newUsername = username
+                                                isEditingUsername = true
+                                            }
+                                    } else {
+                                        Text("Anonymous")
+                                            .font(.title2)
+                                            .bold()
+                                            .foregroundColor(.white)
+                                            .onTapGesture {
+                                                newUsername = ""
+                                                isEditingUsername = true
+                                            }
+                                    }
                                 }
                                 
                                 Text(auth.currentUser?.email ?? "")
@@ -60,7 +105,7 @@ struct ProfileView: View {
                             }
                             
                             // Stats
-                            HStack(spacing: 32) {
+                            HStack(spacing: 48) {
                                 VStack {
                                     Text("12")
                                         .font(.title3)
@@ -91,6 +136,7 @@ struct ProfileView: View {
                                         .foregroundColor(.gray)
                                 }
                             }
+                            .padding()
                         }
                         .padding()
                         
@@ -150,6 +196,12 @@ struct ProfileView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
+                }
+            }
+            .onTapGesture {
+                if isEditingUsername {
+                    isEditingUsername = false
+                    isUsernameFocused = false
                 }
             }
         }

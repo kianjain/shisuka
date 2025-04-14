@@ -1,5 +1,13 @@
 import Foundation
 import Supabase
+import UIKit
+
+enum AuthError: Error {
+    case notAuthenticated
+    case invalidCredentials
+    case emailNotVerified
+    case profileNotFound
+}
 
 class AuthService: ObservableObject {
     static let shared = AuthService()
@@ -25,17 +33,20 @@ class AuthService: ObservableObject {
         
         do {
             let session = try await client.auth.session
-            print("Session found: \(session.user.id)")
+            print("🔍 [Auth] Session found - User ID: \(session.user.id)")
+            print("🔍 [Auth] User metadata: \(session.user.userMetadata)")
+            print("🔍 [Auth] Username from metadata: \(session.user.userMetadata["username"]?.stringValue ?? "nil")")
             
             // Check if user is confirmed
             if session.user.emailConfirmedAt == nil {
-                print("User is not confirmed")
+                print("⚠️ [Auth] User is not confirmed")
                 currentUser = User(
                     id: session.user.id,
                     email: session.user.email ?? "",
                     username: session.user.userMetadata["username"]?.stringValue,
                     createdAt: session.user.createdAt
                 )
+                print("🔍 [Auth] Set unconfirmed user - Username: \(currentUser?.username ?? "nil")")
                 isAuthenticated = false
                 return
             }
@@ -46,18 +57,22 @@ class AuthService: ObservableObject {
                 username: session.user.userMetadata["username"]?.stringValue,
                 createdAt: session.user.createdAt
             )
-            print("Current user set: \(currentUser?.email ?? "no email")")
+            print("✅ [Auth] Current user set - Email: \(currentUser?.email ?? "no email"), Username: \(currentUser?.username ?? "no username")")
             
             // If user is confirmed, fetch or create profile
             await fetchUserProfile()
             if currentProfile == nil {
-                print("No profile found, creating one")
-                await createProfile(for: session.user, username: session.user.userMetadata["username"]?.stringValue ?? "")
+                print("⚠️ [Auth] No profile found, creating one")
+                let username = session.user.userMetadata["username"]?.stringValue ?? "Anonymous"
+                print("🔍 [Auth] Creating profile with username: \(username)")
+                await createProfile(for: session.user, username: username)
+            } else {
+                print("✅ [Auth] Profile found - Username: \(currentProfile?.username ?? "nil")")
             }
             
             isAuthenticated = true
         } catch {
-            print("Error checking auth state: \(error)")
+            print("❌ [Auth] Error checking auth state: \(error)")
             self.error = error
             currentUser = nil
             currentProfile = nil
@@ -138,6 +153,9 @@ class AuthService: ObservableObject {
     @MainActor
     private func createProfile(for user: Auth.User, username: String) async {
         do {
+            print("🔍 [Profile] Creating profile for user: \(user.id)")
+            print("🔍 [Profile] Username to be set: \(username)")
+            
             // Create profile data
             struct ProfileData: Encodable {
                 let id: UUID
@@ -148,25 +166,25 @@ class AuthService: ObservableObject {
             
             let profileData = ProfileData(
                 id: user.id,
-                username: username,
+                username: username.isEmpty ? "Anonymous" : username,
                 created_at: ISO8601DateFormatter().string(from: Date()),
                 updated_at: ISO8601DateFormatter().string(from: Date())
             )
             
-            print("Creating profile with data: \(profileData)")
+            print("🔍 [Profile] Profile data to be inserted: \(profileData)")
             
             let response = try await client
                 .from("profiles")
                 .insert(profileData)
                 .execute()
             
-            print("Profile insert response: \(String(describing: response.data))")
+            print("✅ [Profile] Profile insert response: \(String(describing: response.data))")
             
             // Fetch the created profile
             await fetchUserProfile()
         } catch {
-            print("Error creating profile: \(error)")
-            print("Error details: \(error.localizedDescription)")
+            print("❌ [Profile] Error creating profile: \(error)")
+            print("❌ [Profile] Error details: \(error.localizedDescription)")
             self.error = error
         }
     }
@@ -190,12 +208,14 @@ class AuthService: ObservableObject {
     @MainActor
     private func fetchUserProfile() async {
         guard let userId = currentUser?.id else { 
-            print("No user ID available for profile fetch")
+            print("❌ [Profile] No user ID available for profile fetch")
             return 
         }
         
+        print("🔍 [Profile] Fetching profile for user: \(userId)")
+        print("🔍 [Profile] Current username before fetch: \(currentUser?.username ?? "nil")")
+        
         do {
-            print("Fetching profile for user: \(userId)")
             // First try to find profile by user ID
             let response = try await client
                 .from("profiles")
@@ -204,98 +224,172 @@ class AuthService: ObservableObject {
                 .execute()
             
             let rawData = String(data: response.data, encoding: .utf8) ?? "nil"
-            print("Raw profile data: \(rawData)")
+            print("🔍 [Profile] Raw profile data: \(rawData)")
             
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             
-            // Try to decode the response as an array of profiles
-            if let profiles = try? decoder.decode([Profile].self, from: response.data) {
+            do {
+                let profiles = try decoder.decode([Profile].self, from: response.data)
                 if let profile = profiles.first {
-                    print("Found existing profile: \(profile)")
-                    print("Profile username: \(profile.username ?? "nil")")
+                    print("✅ [Profile] Found existing profile - Username: \(profile.username)")
                     currentProfile = profile
-                } else {
-                    print("No profile found by ID, trying to find by username")
-                    // Try to find profile by username
-                    if let username = currentUser?.username {
-                        let usernameResponse = try await client
-                            .from("profiles")
-                            .select()
-                            .eq("username", value: username)
-                            .execute()
-                        
-                        let usernameRawData = String(data: usernameResponse.data, encoding: .utf8) ?? "nil"
-                        print("Raw profile data by username: \(usernameRawData)")
-                        
-                        if let usernameProfiles = try? decoder.decode([Profile].self, from: usernameResponse.data),
-                           let existingProfile = usernameProfiles.first {
-                            print("Found existing profile by username: \(existingProfile)")
-                            currentProfile = existingProfile
-                        } else {
-                            print("No profile found by username, creating new one")
-                            let session = try await client.auth.session
-                            await createProfile(for: session.user, username: username)
-                        }
-                    }
+                    return
                 }
-            } else {
-                print("Error decoding profiles array")
-                // Try to find profile by username
-                if let username = currentUser?.username {
-                    let usernameResponse = try await client
-                        .from("profiles")
-                        .select()
-                        .eq("username", value: username)
-                        .execute()
-                    
-                    let usernameRawData = String(data: usernameResponse.data, encoding: .utf8) ?? "nil"
-                    print("Raw profile data by username: \(usernameRawData)")
-                    
-                    if let usernameProfiles = try? decoder.decode([Profile].self, from: usernameResponse.data),
-                       let existingProfile = usernameProfiles.first {
-                        print("Found existing profile by username: \(existingProfile)")
-                        currentProfile = existingProfile
-                    } else {
-                        print("No profile found by username, creating new one")
-                        let session = try await client.auth.session
-                        await createProfile(for: session.user, username: username)
-                    }
-                }
+            } catch {
+                print("❌ [Profile] Error decoding profile: \(error)")
             }
+            
+            // If we get here, we need to create a new profile
+            print("⚠️ [Profile] No profile found, creating one")
+            let session = try await client.auth.session
+            let username = session.user.userMetadata["username"]?.stringValue ?? "Anonymous"
+            print("🔍 [Profile] Creating profile with username: \(username)")
+            await createProfile(for: session.user, username: username)
+            
         } catch {
-            print("Error fetching profile: \(error)")
-            print("Fetch error details: \(error.localizedDescription)")
-            // Try to find profile by username
-            if let username = currentUser?.username {
+            print("❌ [Profile] Error fetching profile: \(error)")
+            print("❌ [Profile] Fetch error details: \(error.localizedDescription)")
+            
+            // If it's a duplicate key error, try to fetch the existing profile again
+            if let postgrestError = error as? PostgrestError,
+               postgrestError.code == "23505" {
+                print("⚠️ [Profile] Profile already exists, fetching it again")
                 do {
-                    let usernameResponse = try await client
+                    let response = try await client
                         .from("profiles")
                         .select()
-                        .eq("username", value: username)
+                        .eq("id", value: userId)
                         .execute()
-                    
-                    let usernameRawData = String(data: usernameResponse.data, encoding: .utf8) ?? "nil"
-                    print("Raw profile data by username: \(usernameRawData)")
                     
                     let decoder = JSONDecoder()
                     decoder.dateDecodingStrategy = .iso8601
-                    
-                    if let usernameProfiles = try? decoder.decode([Profile].self, from: usernameResponse.data),
-                       let existingProfile = usernameProfiles.first {
-                        print("Found existing profile by username: \(existingProfile)")
-                        currentProfile = existingProfile
-                    } else {
-                        print("No profile found by username, creating new one")
-                        let session = try await client.auth.session
-                        await createProfile(for: session.user, username: username)
+                    let profiles = try decoder.decode([Profile].self, from: response.data)
+                    if let profile = profiles.first {
+                        print("✅ [Profile] Successfully fetched existing profile - Username: \(profile.username)")
+                        currentProfile = profile
+                        return
                     }
                 } catch {
-                    print("Error getting profile by username: \(error)")
+                    print("❌ [Profile] Error fetching existing profile: \(error)")
                 }
             }
+            
             self.error = error
         }
+    }
+    
+    @MainActor
+    func refreshProfile() async {
+        await fetchUserProfile()
+    }
+    
+    @MainActor
+    func uploadProfileImage(_ data: Data) async throws {
+        guard let userId = currentUser?.id else {
+            print("❌ [Profile] No user ID found")
+            throw AuthError.notAuthenticated
+        }
+        
+        print("🔍 [Profile] Starting image upload for user: \(userId)")
+        print("🔍 [Profile] Original image size: \(data.count) bytes")
+        
+        // Compress the image if it's too large
+        let maxSize = 200 * 1024 // 200KB
+        let compressedData = data.count > maxSize ? compressImage(data) : data
+        print("🔍 [Profile] Compressed image size: \(compressedData.count) bytes")
+        
+        // Generate a unique filename using timestamp
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let filePath = "\(userId)/avatar_\(timestamp).jpg"
+        
+        // Upload the image
+        let _ = try await client.storage
+            .from("avatars")
+            .upload(filePath, data: compressedData)
+        
+        // Get the public URL
+        let url = try await client.storage
+            .from("avatars")
+            .getPublicURL(path: filePath)
+        
+        // Update the profile with the new avatar URL
+        try await updateProfile(avatarUrl: url.absoluteString)
+        
+        print("✅ [Profile] Successfully uploaded and updated profile image")
+    }
+    
+    private func compressImage(_ data: Data) -> Data {
+        guard let image = UIImage(data: data) else {
+            print("❌ [Profile] Failed to create image from data")
+            return data
+        }
+        
+        // Resize image to max 1024x1024 while maintaining aspect ratio
+        let maxSize: CGFloat = 1024
+        let scale = min(maxSize / image.size.width, maxSize / image.size.height)
+        let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        guard let resizedImage = resizedImage,
+              let compressedData = resizedImage.jpegData(compressionQuality: 0.7) else {
+            print("❌ [Profile] Failed to compress image")
+            return data
+        }
+        
+        return compressedData
+    }
+    
+    @MainActor
+    private func updateProfile(avatarUrl: String) async throws {
+        guard let userId = currentUser?.id else {
+            print("❌ [Profile] No user ID found for profile update")
+            throw AuthError.notAuthenticated
+        }
+        
+        print("🔍 [Profile] Updating profile with new avatar URL: \(avatarUrl)")
+        
+        let response = try await client
+            .from("profiles")
+            .update([
+                "avatar_url": avatarUrl,
+                "updated_at": ISO8601DateFormatter().string(from: Date())
+            ] as [String: String])
+            .eq("id", value: userId)
+            .execute()
+        
+        print("✅ [Profile] Profile update response: \(String(describing: response.data))")
+        
+        // Refresh the profile to get the updated data
+        await refreshProfile()
+    }
+    
+    @MainActor
+    func updateUsername(_ newUsername: String) async throws {
+        guard let userId = currentUser?.id else {
+            print("❌ [Profile] No user ID found for username update")
+            throw AuthError.notAuthenticated
+        }
+        
+        print("🔍 [Profile] Updating username to: \(newUsername)")
+        
+        let response = try await client
+            .from("profiles")
+            .update([
+                "username": newUsername,
+                "updated_at": ISO8601DateFormatter().string(from: Date())
+            ] as [String: String])
+            .eq("id", value: userId)
+            .execute()
+        
+        print("✅ [Profile] Username update response: \(String(describing: response.data))")
+        
+        // Refresh the profile to get the updated data
+        await refreshProfile()
     }
 }
 
@@ -315,7 +409,7 @@ struct User: Identifiable, Codable {
 
 struct Profile: Identifiable, Codable {
     let id: UUID
-    var username: String?
+    var username: String
     var avatarUrl: String?
     var bio: String?
     let createdAt: Date
@@ -328,5 +422,31 @@ struct Profile: Identifiable, Codable {
         case bio
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        username = try container.decode(String.self, forKey: .username)
+        avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
+        bio = try container.decodeIfPresent(String.self, forKey: .bio)
+        
+        // Custom date decoding with multiple formatters
+        let dateFormatter = ISO8601DateFormatter()
+        let dateFormatterWithFractional = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime]
+        dateFormatterWithFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        let createdAtString = try container.decode(String.self, forKey: .createdAt)
+        let updatedAtString = try container.decode(String.self, forKey: .updatedAt)
+        
+        // Try both formatters for each date
+        if let createdAtDate = dateFormatter.date(from: createdAtString) ?? dateFormatterWithFractional.date(from: createdAtString),
+           let updatedAtDate = dateFormatter.date(from: updatedAtString) ?? dateFormatterWithFractional.date(from: updatedAtString) {
+            createdAt = createdAtDate
+            updatedAt = updatedAtDate
+        } else {
+            throw DecodingError.dataCorruptedError(forKey: .createdAt, in: container, debugDescription: "Date string does not match any expected format.")
+        }
     }
 } 

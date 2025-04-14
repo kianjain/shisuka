@@ -1,9 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "background.png",
-      "idiom" : "universal",
-      "scale" : "1x"
+      "filename" : "background.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

@@ -158,11 +158,8 @@ struct UploadView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
+                    ProfileButton(size: 32) {
                         showingProfile = true
-                    }) {
-                        Image(systemName: "person.crop.circle.fill")
-                            .foregroundColor(.white)
                     }
                 }
                 

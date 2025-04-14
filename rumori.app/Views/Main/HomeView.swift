@@ -132,7 +132,7 @@ struct FeedbackCountCard: View {
     var body: some View {
         VStack {
             Text("\(count)")
-                .font(.system(size: 82, weight: .semibold))
+                .font(.system(size: 72, weight: .semibold))
                 .foregroundColor(.white)
                 // Subtle shadows for depth
                 .shadow(color: Color.black.opacity(0.3), radius: 20, x: -2, y: 2)
@@ -663,12 +663,9 @@ struct HomeView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
+                    ProfileButton(size: 32, action: {
                         showingProfile = true
-                    }) {
-                        Image(systemName: "person.crop.circle.fill")
-                            .foregroundColor(.white)
-                    }
+                    })
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
