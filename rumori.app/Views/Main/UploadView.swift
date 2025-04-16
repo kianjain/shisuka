@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import Supabase
 
 struct InputField: View {
     let title: String
@@ -118,7 +120,6 @@ struct RumorsSelection: View {
 struct UploadView: View {
     @State private var projectName: String = ""
     @State private var projectDescription: String = ""
-    @State private var desiredFeedback: Double = 1
     @State private var showingFilePicker = false
     @State private var selectedFileName: String = "No file selected"
     @State private var selectedFileURL: URL?
@@ -128,6 +129,9 @@ struct UploadView: View {
     @State private var showingProfile = false
     @State private var showingSettings = false
     @State private var showingNotifications = false
+    @State private var showingImagePicker = false
+    @State private var selectedImage: PhotosPickerItem?
+    @State private var imageData: Data?
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: Int = 4
     
@@ -191,14 +195,57 @@ struct UploadView: View {
             .sheet(isPresented: $showingNotifications) {
                 ActivityView()
             }
+            .photosPicker(isPresented: $showingImagePicker, selection: $selectedImage, matching: .images)
+            .onChange(of: selectedImage) { oldValue, newValue in
+                Task {
+                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
+                        imageData = data
+                        selectedFileName = "Selected Image"
+                    }
+                }
+            }
         }
     }
     
     private var uploadSection: some View {
         VStack(spacing: 24) {
             // File Selection
-            FilePickerButton(fileName: selectedFileName) {
-                showingFilePicker = true
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Project File")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                HStack(spacing: 12) {
+                    // Photo Library Button
+                    Button(action: { showingImagePicker = true }) {
+                        HStack {
+                            Image(systemName: "photo")
+                                .font(.title2)
+                            Text("Photo Library")
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1.5)
+                        )
+                    }
+                    .foregroundColor(.white)
+                }
+                
+                // Image Preview
+                if let imageData = imageData, let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 200)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
             
             // Project Name
@@ -216,9 +263,6 @@ struct UploadView: View {
                 isMultiline: true
             )
             
-            // Rumors Amount Selection
-            RumorsSelection(value: $desiredFeedback)
-            
             // Upload Button
             Button(action: validateAndUpload) {
                 Text("Upload Project")
@@ -235,43 +279,54 @@ struct UploadView: View {
                     .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
             }
             .padding(.top, 8)
-            .disabled(projectName.isEmpty || selectedFileName == "No file selected" || isUploading)
-            .opacity(projectName.isEmpty || selectedFileName == "No file selected" || isUploading ? 0.6 : 1.0)
+            .disabled(projectName.isEmpty || imageData == nil || isUploading)
+            .opacity(projectName.isEmpty || imageData == nil || isUploading ? 0.6 : 1.0)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 16)
         .padding(.top, 16)
     }
     
     private func validateAndUpload() {
-        do {
-            // Validate required fields
-            guard !projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw UploadError.emptyFields
-            }
-            
-            isUploading = true
-            
-            // Simulate upload delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                print("Mock upload successful for project: \(projectName)")
-                print("Description: \(projectDescription)")
-                print("Desired feedback: \(Int(desiredFeedback)) rumors")
-                print("File: \(selectedFileName)")
+        Task {
+            do {
+                // Validate required fields
+                guard !projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw UploadError.emptyFields
+                }
+                
+                guard let imageData = imageData else {
+                    throw UploadError.noFileSelected
+                }
+                
+                isUploading = true
+                
+                // Upload the project
+                let project = try await ProjectService.shared.uploadProject(
+                    title: projectName,
+                    description: projectDescription.isEmpty ? nil : projectDescription,
+                    imageData: imageData
+                )
+                
+                print("✅ Project uploaded successfully: \(project.title)")
                 
                 // Reset form
                 projectName = ""
                 projectDescription = ""
-                desiredFeedback = 1
                 selectedFileName = "No file selected"
-                selectedFileURL = nil
+                self.imageData = nil
                 isUploading = false
+                
+            } catch UploadError.emptyFields {
+                errorMessage = "Please fill in all required fields"
+                showError = true
+            } catch UploadError.noFileSelected {
+                errorMessage = "Please select a file to upload"
+                showError = true
+            } catch {
+                errorMessage = "Error uploading project: \(error.localizedDescription)"
+                showError = true
             }
-        } catch UploadError.emptyFields {
-            errorMessage = "Please fill in all required fields"
-            showError = true
-        } catch {
-            errorMessage = "Unexpected error: \(error.localizedDescription)"
-            showError = true
+            isUploading = false
         }
     }
     
@@ -279,5 +334,6 @@ struct UploadView: View {
         case fileTooLarge
         case invalidFileType
         case emptyFields
+        case noFileSelected
     }
 } 
