@@ -49,7 +49,8 @@ struct Project: Identifiable, Codable {
     let userId: UUID
     let title: String
     let description: String?
-    let filePath: String
+    let imagePath: String
+    let audioPath: String?
     let createdAt: Date
     let updatedAt: Date
     var status: ProjectStatus = .active
@@ -59,7 +60,8 @@ struct Project: Identifiable, Codable {
         case userId = "user_id"
         case title
         case description
-        case filePath = "file_path"
+        case imagePath = "image_path"
+        case audioPath = "audio_path"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case status
@@ -71,7 +73,8 @@ struct Project: Identifiable, Codable {
         userId = try container.decode(UUID.self, forKey: .userId)
         title = try container.decode(String.self, forKey: .title)
         description = try container.decodeIfPresent(String.self, forKey: .description)
-        filePath = try container.decode(String.self, forKey: .filePath)
+        imagePath = try container.decode(String.self, forKey: .imagePath)
+        audioPath = try container.decodeIfPresent(String.self, forKey: .audioPath)
         status = try container.decodeIfPresent(ProjectStatus.self, forKey: .status) ?? .active
         
         // Custom date decoding with multiple formatters

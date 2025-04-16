@@ -67,75 +67,30 @@ struct FilePickerButton: View {
     }
 }
 
-struct RumorsSelection: View {
-    @Binding var value: Double
-    private let options = [1, 2, 3, 5, 10]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Desired Feedback")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(options, id: \.self) { option in
-                        Button(action: { value = Double(option) }) {
-                            Text("\(option)")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Int(value) == option ? Color(.systemGray6) : Color(.systemGray6))
-                                .foregroundColor(Int(value) == option ? .white : .white)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(
-                                            Int(value) == option ? 
-                                            Color.white : 
-                                            Color.gray.opacity(0.3),
-                                            lineWidth: Int(value) == option ? 2 : 1
-                                        )
-                                )
-                                .shadow(
-                                    color: Int(value) == option ? 
-                                        Color(red: 0.4, green: 0.4, blue: 1.0).opacity(0.3) : 
-                                        Color.black.opacity(0.2),
-                                    radius: Int(value) == option ? 8 : 0,
-                                    x: 0,
-                                    y: Int(value) == option ? 2 : 0
-                                )
-                        }
-                    }
-                }
-                
-                Text("This will cost \(Int(value)) rumors")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-        }
-    }
-}
-
 struct UploadView: View {
-    @State private var projectName: String = ""
-    @State private var projectDescription: String = ""
-    @State private var showingFilePicker = false
-    @State private var selectedFileName: String = "No file selected"
-    @State private var selectedFileURL: URL?
+    enum UploadType {
+        case photo
+        case audio
+    }
+    
+    @StateObject private var viewModel = UploadViewModel()
+    @State private var selectedImage: PhotosPickerItem?
+    @State private var selectedAudio: URL?
+    @State private var imageData: Data?
+    @State private var audioData: Data?
+    @State private var projectName = ""
+    @State private var projectDescription = ""
+    @State private var isUploading = false
     @State private var showError = false
     @State private var errorMessage = ""
-    @State private var isUploading = false
+    @State private var selectedUploadType: UploadType?
     @State private var showingProfile = false
     @State private var showingSettings = false
     @State private var showingNotifications = false
     @State private var showingImagePicker = false
-    @State private var selectedImage: PhotosPickerItem?
-    @State private var imageData: Data?
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: Int = 4
-    
-    private let maxFileSize: Int64 = 100 * 1024 * 1024 // 100MB
+    @State private var showFilePicker = false
     
     var body: some View {
         NavigationStack {
@@ -146,10 +101,182 @@ struct UploadView: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Upload section
-                        uploadSection
+                        // File Selection
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Project File")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            if selectedUploadType == nil {
+                                HStack(spacing: 12) {
+                                    // Photo Library Button
+                                    Button(action: { 
+                                        selectedUploadType = .photo
+                                        showingImagePicker = true 
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "photo")
+                                                .font(.title2)
+                                            Text("Photo Library")
+                                                .lineLimit(1)
+                                            Spacer()
+                                        }
+                                        .padding(12)
+                                        .background(Color(.systemGray6))
+                                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1.5)
+                                        )
+                                    }
+                                    .foregroundColor(.white)
+                                    
+                                    // Audio File Button
+                                    Button(action: { 
+                                        selectedUploadType = .audio
+                                        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio])
+                                        picker.delegate = viewModel
+                                        UIApplication.shared.windows.first?.rootViewController?.present(picker, animated: true)
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "music.note")
+                                                .font(.title2)
+                                            Text("Audio File")
+                                                .lineLimit(1)
+                                            Spacer()
+                                        }
+                                        .padding(12)
+                                        .background(Color(.systemGray6))
+                                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1.5)
+                                        )
+                                    }
+                                    .foregroundColor(.white)
+                                }
+                            }
+                            
+                            // Cancel Button (always visible when upload type is selected)
+                            if selectedUploadType != nil {
+                                Button(action: {
+                                    // Reset all state variables
+                                    selectedUploadType = nil
+                                    selectedImage = nil
+                                    imageData = nil
+                                    selectedAudio = nil
+                                    audioData = nil
+                                    projectName = ""
+                                    projectDescription = ""
+                                    isUploading = false
+                                    showError = false
+                                    errorMessage = ""
+                                }) {
+                                    HStack {
+                                        Image(systemName: "xmark.circle")
+                                            .font(.title2)
+                                        Text("Cancel")
+                                            .lineLimit(1)
+                                        Spacer()
+                                    }
+                                    .padding(12)
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1.5)
+                                    )
+                                }
+                                .foregroundColor(.white)
+                                .padding(.top, selectedUploadType == nil ? 0 : 8)
+                            }
+                            
+                            // Image Preview
+                            if let imageData = imageData, let uiImage = UIImage(data: imageData) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 200)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            
+                            // Audio File Info
+                            if let audioURL = selectedAudio {
+                                Text("Selected: \(audioURL.lastPathComponent)")
+                                    .foregroundColor(.white)
+                                    .padding(.top, 8)
+                            }
+                            
+                            // Optional Cover Image for Audio
+                            if selectedUploadType == .audio && imageData == nil {
+                                Button(action: { showingImagePicker = true }) {
+                                    HStack {
+                                        Image(systemName: "photo")
+                                            .font(.title2)
+                                        Text("Add Cover Image (Optional)")
+                                            .lineLimit(1)
+                                        Spacer()
+                                    }
+                                    .padding(12)
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1.5)
+                                    )
+                                }
+                                .foregroundColor(.white)
+                                .padding(.top, 8)
+                            }
+                        }
+                        
+                        // Project Name
+                        InputField(
+                            title: "Project Name",
+                            placeholder: "Enter project name",
+                            text: $projectName
+                        )
+                        
+                        // Project Description
+                        InputField(
+                            title: "Project Description",
+                            placeholder: "Describe your project...",
+                            text: $projectDescription,
+                            isMultiline: true
+                        )
+                        
+                        // Upload Button
+                        Button(action: uploadProject) {
+                            if isUploading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            } else {
+                                Text("Upload Project")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.black)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.white, lineWidth: 1)
+                                    )
+                                    .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
+                            }
+                        }
+                        .padding(.top, 8)
+                        .disabled(projectName.isEmpty || isUploading || 
+                                (selectedUploadType == .photo && imageData == nil) ||
+                                (selectedUploadType == .audio && audioData == nil))
+                        .opacity(projectName.isEmpty || isUploading || 
+                                (selectedUploadType == .photo && imageData == nil) ||
+                                (selectedUploadType == .audio && audioData == nil) ? 0.6 : 1.0)
                     }
-                    .padding(.bottom, 32)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
                 }
                 .scrollIndicators(.hidden)
             }
@@ -199,141 +326,67 @@ struct UploadView: View {
             .onChange(of: selectedImage) { oldValue, newValue in
                 Task {
                     if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                        imageData = data
-                        selectedFileName = "Selected Image"
+                        self.imageData = data
+                    } else {
+                        self.imageData = nil
+                    }
+                }
+            }
+            .onChange(of: viewModel.selectedAudioURL) { oldValue, newValue in
+                if let url = newValue {
+                    selectedAudio = url
+                    do {
+                        audioData = try Data(contentsOf: url)
+                    } catch {
+                        showError = true
+                        errorMessage = "Failed to load audio file: \(error.localizedDescription)"
                     }
                 }
             }
         }
     }
     
-    private var uploadSection: some View {
-        VStack(spacing: 24) {
-            // File Selection
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Project File")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                HStack(spacing: 12) {
-                    // Photo Library Button
-                    Button(action: { showingImagePicker = true }) {
-                        HStack {
-                            Image(systemName: "photo")
-                                .font(.title2)
-                            Text("Photo Library")
-                                .lineLimit(1)
-                            Spacer()
-                        }
-                        .padding(12)
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1.5)
-                        )
-                    }
-                    .foregroundColor(.white)
-                }
-                
-                // Image Preview
-                if let imageData = imageData, let uiImage = UIImage(data: imageData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 200)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
-            
-            // Project Name
-            InputField(
-                title: "Project Name",
-                placeholder: "Enter project name",
-                text: $projectName
-            )
-            
-            // Project Description
-            InputField(
-                title: "Project Description",
-                placeholder: "Describe your project...",
-                text: $projectDescription,
-                isMultiline: true
-            )
-            
-            // Upload Button
-            Button(action: validateAndUpload) {
-                Text("Upload Project")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white, lineWidth: 1)
-                    )
-                    .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
-            }
-            .padding(.top, 8)
-            .disabled(projectName.isEmpty || imageData == nil || isUploading)
-            .opacity(projectName.isEmpty || imageData == nil || isUploading ? 0.6 : 1.0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-    }
-    
-    private func validateAndUpload() {
+    private func uploadProject() {
+        guard let uploadType = selectedUploadType else { return }
+        
+        isUploading = true
+        
         Task {
             do {
-                // Validate required fields
-                guard !projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    throw UploadError.emptyFields
-                }
-                
-                guard let imageData = imageData else {
-                    throw UploadError.noFileSelected
-                }
-                
-                isUploading = true
-                
-                // Upload the project
                 let project = try await ProjectService.shared.uploadProject(
                     title: projectName,
                     description: projectDescription.isEmpty ? nil : projectDescription,
-                    imageData: imageData
+                    imageData: imageData,
+                    audioData: uploadType == .audio ? audioData : nil
                 )
                 
-                print("✅ Project uploaded successfully: \(project.title)")
-                
                 // Reset form
-                projectName = ""
-                projectDescription = ""
-                selectedFileName = "No file selected"
-                self.imageData = nil
-                isUploading = false
-                
-            } catch UploadError.emptyFields {
-                errorMessage = "Please fill in all required fields"
-                showError = true
-            } catch UploadError.noFileSelected {
-                errorMessage = "Please select a file to upload"
-                showError = true
+                DispatchQueue.main.async {
+                    self.projectName = ""
+                    self.projectDescription = ""
+                    self.imageData = nil
+                    self.audioData = nil
+                    self.selectedImage = nil
+                    self.selectedAudio = nil
+                    self.selectedUploadType = nil
+                    self.isUploading = false
+                }
             } catch {
-                errorMessage = "Error uploading project: \(error.localizedDescription)"
-                showError = true
+                DispatchQueue.main.async {
+                    self.showError = true
+                    self.errorMessage = error.localizedDescription
+                    self.isUploading = false
+                }
             }
-            isUploading = false
         }
     }
+}
+
+class UploadViewModel: NSObject, ObservableObject, UIDocumentPickerDelegate {
+    @Published var selectedAudioURL: URL?
     
-    private enum UploadError: Error {
-        case fileTooLarge
-        case invalidFileType
-        case emptyFields
-        case noFileSelected
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        selectedAudioURL = url
     }
 } 
