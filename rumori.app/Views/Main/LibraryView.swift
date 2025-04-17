@@ -2,19 +2,54 @@ import SwiftUI
 
 struct ProjectCard: View {
     let project: ProjectPreview
+    @State private var imageError: Error?
     
     var body: some View {
         NavigationLink(destination: ProjectView(project: project)) {
             HStack(spacing: 16) {
                 // Square Project Image
-                if let imageUrl = project.imageUrl {
-                    AsyncImage(url: imageUrl) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 80, height: 80)
-                            .clipped()
-                    } placeholder: {
+                Group {
+                    if let imageUrl = project.imageUrl {
+                        AsyncImage(url: imageUrl) { phase in
+                            switch phase {
+                            case .empty:
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 80, height: 80)
+                                    .overlay(
+                                        ProgressView()
+                                            .tint(.white)
+                                    )
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 80, height: 80)
+                                    .clipped()
+                            case .failure(let error):
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 80, height: 80)
+                                    .overlay(
+                                        Image(systemName: fileTypeIcon)
+                                            .font(.title2)
+                                            .foregroundColor(.gray)
+                                    )
+                                    .onAppear {
+                                        imageError = error
+                                    }
+                            @unknown default:
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 80, height: 80)
+                                    .overlay(
+                                        Image(systemName: fileTypeIcon)
+                                            .font(.title2)
+                                            .foregroundColor(.gray)
+                                    )
+                            }
+                        }
+                    } else {
                         Rectangle()
                             .fill(Color.gray.opacity(0.3))
                             .frame(width: 80, height: 80)
@@ -24,18 +59,8 @@ struct ProjectCard: View {
                                     .foregroundColor(.gray)
                             )
                     }
-                    .cornerRadius(10)
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 80, height: 80)
-                        .overlay(
-                            Image(systemName: fileTypeIcon)
-                                .font(.title2)
-                                .foregroundColor(.gray)
-                        )
-                        .cornerRadius(10)
                 }
+                .cornerRadius(10)
                 
                 // Content
                 VStack(alignment: .leading, spacing: 12) {
@@ -106,80 +131,10 @@ struct LibraryView: View {
     @State private var selectedFilter: String = "All"
     @State private var showingUpload = false
     @State private var selectedTab: Int = 3
+    @State private var projects: [ProjectPreview] = []
+    @State private var isLoading = true
+    @State private var error: Error?
     @Environment(\.colorScheme) private var colorScheme
-    
-    // Mock data
-    private let mockProjects = [
-        ProjectPreview(
-            id: UUID(),
-            name: "Summer Beat",
-            description: "A fresh electronic track with tropical vibes. Looking for feedback on the mix and arrangement.",
-            fileType: "Audio",
-            author: "MusicMaker",
-            imageUrl: URL(string: "https://example.com/summer-beat-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-7*24*3600),
-            status: .active,
-            feedback: [
-                Feedback(
-                    id: UUID(),
-                    author: "SoundMaster",
-                    comment: "Great mix! The tropical elements really shine through. Maybe consider adding more percussion in the bridge section.",
-                    rating: 1,
-                    date: Date().addingTimeInterval(-2*24*3600)
-                )
-            ],
-            rumorsSpent: 0,
-            likes: 12,
-            isOwnedByUser: true,
-            lastStatusUpdate: nil
-        ),
-        ProjectPreview(
-            id: UUID(),
-            name: "Portrait Series",
-            description: "A collection of street photography shots. Need feedback on composition and editing.",
-            fileType: "Images",
-            author: "PhotoArtist",
-            imageUrl: URL(string: "https://example.com/portrait-series-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-14*24*3600),
-            status: .completed,
-            feedback: [
-                Feedback(
-                    id: UUID(),
-                    author: "PhotoCritic",
-                    comment: "The composition is excellent, especially in the urban environment shots. The contrast could be slightly increased in some images.",
-                    rating: 1,
-                    date: Date().addingTimeInterval(-5*24*3600)
-                )
-            ],
-            rumorsSpent: 0,
-            likes: 8,
-            isOwnedByUser: true,
-            lastStatusUpdate: nil
-        ),
-        ProjectPreview(
-            id: UUID(),
-            name: "Short Film Draft",
-            description: "A 5-minute drama about family relationships. Looking for feedback on pacing and narrative.",
-            fileType: "Video",
-            author: "FilmStudent",
-            imageUrl: URL(string: "https://example.com/short-film-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-21*24*3600),
-            status: .archived,
-            feedback: [
-                Feedback(
-                    id: UUID(),
-                    author: "FilmReviewer",
-                    comment: "The pacing works well for the story. The emotional moments are well captured. Consider tightening the middle section slightly.",
-                    rating: 1,
-                    date: Date().addingTimeInterval(-10*24*3600)
-                )
-            ],
-            rumorsSpent: 0,
-            likes: 15,
-            isOwnedByUser: true,
-            lastStatusUpdate: nil
-        )
-    ]
     
     private let filters = ["All", "Audio", "Image", "Active", "Completed", "Archived"]
     
@@ -203,15 +158,52 @@ struct LibraryView: View {
                         }
                         
                         // Projects List
-                        LazyVStack(spacing: 16) {
-                            ForEach(mockProjects.filter { project in
-                                if selectedFilter == "All" { return true }
-                                if selectedFilter == "Audio" { return project.fileType == "Audio" }
-                                if selectedFilter == "Image" { return project.fileType == "Images" }
-                                return project.status.rawValue == selectedFilter
-                            }) { project in
-                                ProjectCard(project: project)
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .padding(.top, 100)
+                        } else if let error = error {
+                            VStack(spacing: 12) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.red)
+                                Text("Error loading projects")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text(error.localizedDescription)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.center)
                                     .padding(.horizontal)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 100)
+                        } else if projects.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "folder.badge.plus")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.gray)
+                                Text("No projects yet")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("Upload your first project to get started")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 100)
+                        } else {
+                            LazyVStack(spacing: 16) {
+                                ForEach(projects.filter { project in
+                                    if selectedFilter == "All" { return true }
+                                    if selectedFilter == "Audio" { return project.fileType == "Audio" }
+                                    if selectedFilter == "Image" { return project.fileType == "Images" }
+                                    return project.status.rawValue == selectedFilter
+                                }) { project in
+                                    ProjectCard(project: project)
+                                        .padding(.horizontal)
+                                }
                             }
                         }
                     }
@@ -261,7 +253,51 @@ struct LibraryView: View {
             .sheet(isPresented: $showingNotifications) {
                 ActivityView()
             }
+            .task {
+                await loadProjects()
+            }
         }
+    }
+    
+    private func loadProjects() async {
+        isLoading = true
+        error = nil
+        
+        do {
+            let projects = try await ProjectService.shared.getProjects()
+            self.projects = projects.map { project in
+                print("🔍 [Library] Project: \(project.title)")
+                print("🔍 [Library] Image path: \(project.imagePath)")
+                let imageUrl = {
+                    let storage = SupabaseManager.shared.client.storage.from("project_files")
+                    let url = try? storage.getPublicURL(path: project.imagePath)
+                    print("🔍 [Library] Generated URL: \(String(describing: url))")
+                    return url
+                }()
+                print("🔍 [Library] Final image URL: \(String(describing: imageUrl))")
+                
+                return ProjectPreview(
+                    id: project.id,
+                    name: project.title,
+                    description: project.description ?? "",
+                    fileType: project.audioPath != nil ? "Audio" : "Images",
+                    author: "You",
+                    imageUrl: imageUrl,
+                    uploadDate: project.createdAt,
+                    status: .active,
+                    feedback: [],
+                    rumorsSpent: 0,
+                    likes: 0,
+                    isOwnedByUser: true,
+                    lastStatusUpdate: project.updatedAt
+                )
+            }
+        } catch {
+            self.error = error
+            print("❌ Error loading projects: \(error)")
+        }
+        
+        isLoading = false
     }
     
     private func filterPill(_ filter: String) -> some View {

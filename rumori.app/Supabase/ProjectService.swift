@@ -109,12 +109,12 @@ class ProjectService: ObservableObject {
             print("❌ [Project] Error uploading project: \(error)")
             // If we uploaded files but failed to create the project, try to clean up
             if let imagePath = imageFilePath {
-                try? await client.storage
+                _ = try? await client.storage
                     .from("project_files")
                     .remove(paths: [imagePath])
             }
             if let audioPath = audioFilePath {
-                try? await client.storage
+                _ = try? await client.storage
                     .from("project_files")
                     .remove(paths: [audioPath])
             }
