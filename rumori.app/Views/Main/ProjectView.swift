@@ -1,19 +1,18 @@
 import SwiftUI
+import AVFoundation
 
 // MARK: - Project Image View
 private struct ProjectImageView: View {
-    let fileType: String
-    let imageUrl: URL?
+    let imageURL: URL?
     
     var body: some View {
         Group {
-            if let imageUrl = imageUrl {
-                AsyncImage(url: imageUrl) { image in
+            if let imageURL = imageURL {
+                AsyncImage(url: imageURL) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 340)
                         .clipped()
                 } placeholder: {
                     placeholderView
@@ -24,34 +23,24 @@ private struct ProjectImageView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal)
-        .padding(.top)
     }
     
     private var placeholderView: some View {
         Rectangle()
             .fill(Color.gray.opacity(0.3))
             .frame(maxWidth: .infinity)
-            .frame(height: 340)
+            .aspectRatio(16/9, contentMode: .fit)
             .overlay(
-                Image(systemName: getFileTypeIcon(for: fileType))
+                Image(systemName: "photo")
                     .font(.system(size: 40))
                     .foregroundColor(.white.opacity(0.5))
             )
-    }
-    
-    private func getFileTypeIcon(for fileType: String) -> String {
-        switch fileType {
-        case "Audio": return "waveform"
-        case "Images": return "photo"
-        case "Video": return "video"
-        default: return "doc"
-        }
     }
 }
 
 // MARK: - Project Info View
 private struct ProjectInfoView: View {
-    let project: ProjectPreview
+    let project: Project
     @Binding var isFavorite: Bool
     
     var body: some View {
@@ -59,19 +48,13 @@ private struct ProjectInfoView: View {
             // Header with Favorite Button
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(project.name)
+                    Text(project.title)
                         .font(.title)
                         .bold()
                         .foregroundColor(.white)
-                    if project.isOwnedByUser {
-                        Text("Added \(project.uploadDate.formatted(date: .abbreviated, time: .omitted))")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    } else {
-                        Text("by \(project.author)")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
+                    Text("Added \(project.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
                 }
                 
                 Spacer()
@@ -82,39 +65,6 @@ private struct ProjectInfoView: View {
                         .foregroundColor(isFavorite ? .yellow : .gray)
                 }
             }
-            
-            // Project Type Badge
-            Text(project.fileType)
-                .font(.subheadline)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color(.systemGray5))
-                .foregroundColor(.white)
-                .cornerRadius(8)
-            
-            // Description
-            Text(project.description)
-                .font(.body)
-                .foregroundColor(.gray)
-                .lineLimit(nil)
-            
-            // Stats
-            HStack(spacing: 24) {
-                HStack(spacing: 4) {
-                    Image(systemName: "bubble.left.fill")
-                        .foregroundColor(.gray)
-                    Text("\(project.feedback.count)")
-                        .foregroundColor(.gray)
-                }
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "star.fill")
-                        .foregroundColor(.gray)
-                    Text("\(project.likes)")
-                        .foregroundColor(.gray)
-                }
-            }
-            .font(.subheadline)
         }
         .padding(.horizontal)
     }
@@ -206,53 +156,91 @@ private struct FeedbackInputView: View {
 
 // MARK: - Main Project View
 struct ProjectView: View {
-    let project: ProjectPreview
-    @Environment(\.dismiss) private var dismiss
+    @StateObject private var projectService = ProjectService.shared
+    @State private var project: Project?
+    @State private var isLoading = true
+    @State private var error: Error?
     @State private var isFavorite = false
+    let projectId: String
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                ProjectImageView(fileType: project.fileType, imageUrl: project.imageUrl)
-                ProjectInfoView(project: project, isFavorite: $isFavorite)
-                
-                if project.isOwnedByUser {
-                    ReviewsView(feedback: project.feedback)
-                } else {
-                    FeedbackInputView { feedbackText in
-                        submitFeedback(feedbackText)
+            VStack(alignment: .leading, spacing: 24) {
+                if let project = project {
+                    // Cover image
+                    let storage = SupabaseManager.shared.client.storage.from("project_files")
+                    if let imageURL = try? storage.getPublicURL(path: project.imagePath) {
+                        ProjectImageView(imageURL: imageURL)
                     }
+                    
+                    // Project Info (Title and Date)
+                    ProjectInfoView(project: project, isFavorite: $isFavorite)
+                    
+                    // Audio player
+                    if let audioPath = project.audioPath {
+                        let storage = SupabaseManager.shared.client.storage.from("project_files")
+                        if let audioURL = try? storage.getPublicURL(path: audioPath) {
+                            AudioPlayerView(audioURL: audioURL)
+                                .padding(.horizontal)
+                        }
+                    }
+                    
+                    // Description
+                    if let description = project.description {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Description")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(.horizontal)
+                            
+                            Text(description)
+                                .font(.body)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(4...)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .padding(.horizontal)
+                        }
+                    }
+                    
+                    // Reviews
+                    ReviewsView(feedback: [])
+                } else if isLoading {
+                    ProgressView()
+                } else if let error = error {
+                    Text("Error: \(error.localizedDescription)")
+                        .foregroundColor(.red)
                 }
             }
-            .padding(.bottom, 32)
+            .padding(.vertical)
+            .padding(.bottom, 24)
         }
-        .scrollIndicators(.hidden)
-        .background(Color.black)
+        .background(Color.black.ignoresSafeArea())
         .navigationBarHidden(true)
+        .scrollIndicators(.hidden)
+        .onAppear {
+            loadProject()
+        }
     }
     
-    private func submitFeedback(_ text: String) {
-        // Handle feedback submission
-        print("Submitting feedback: \(text)")
+    private func loadProject() {
+        Task {
+            do {
+                project = try await projectService.getProjects().first { $0.id.uuidString == projectId }
+                isLoading = false
+            } catch {
+                self.error = error
+                isLoading = false
+            }
+        }
     }
 }
 
 #Preview {
     NavigationStack {
-        ProjectView(project: ProjectPreview(
-            id: UUID(),
-            name: "Summer Beat",
-            description: "A fresh electronic track with tropical vibes. Looking for feedback on the mix and arrangement.",
-            fileType: "Audio",
-            author: "MusicMaker",
-            imageUrl: URL(string: "https://example.com/summer-beat-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-7*24*3600),
-            status: .active,
-            feedback: [],
-            rumorsSpent: 0,
-            likes: 12,
-            isOwnedByUser: false,
-            lastStatusUpdate: nil
-        ))
+        ProjectView(projectId: "1")
     }
 } 

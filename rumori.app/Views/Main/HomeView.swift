@@ -51,7 +51,7 @@ struct FeaturedProjectCard: View {
     let project: ProjectPreview
     
     var body: some View {
-        NavigationLink(destination: ProjectView(project: project)) {
+        NavigationLink(destination: ProjectView(projectId: project.id.uuidString)) {
             HStack(spacing: 16) {
                 // Square Project Image
                 if let imageUrl = project.imageUrl {
@@ -201,21 +201,7 @@ struct MinimalisticCard: View {
             // Items
             VStack(spacing: 12) {
                 ForEach(items, id: \.name) { item in
-                    NavigationLink(destination: ProjectView(project: ProjectPreview(
-                        id: UUID(),
-                        name: item.name,
-                        description: item.description,
-                        fileType: item.type,
-                        author: "You",
-                        imageUrl: item.imageUrl,
-                        uploadDate: Date(),
-                        status: .active,
-                        feedback: [],
-                        rumorsSpent: 0,
-                        likes: 0,
-                        isOwnedByUser: true,
-                        lastStatusUpdate: nil
-                    ))) {
+                    NavigationLink(destination: ProjectView(projectId: item.name)) {
                         HStack(spacing: 12) {
                             // Image or Icon
                             if let imageUrl = item.imageUrl {
@@ -552,21 +538,7 @@ struct HomeView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 16) {
                                     ForEach(reviewProjects, id: \.title) { project in
-                                        NavigationLink(destination: ProjectView(project: ProjectPreview(
-                                            id: UUID(),
-                                            name: project.title,
-                                            description: "Sample description for \(project.title)",
-                                            fileType: project.type,
-                                            author: "Sample Author",
-                                            imageUrl: project.imageUrl,
-                                            uploadDate: Date(),
-                                            status: .active,
-                                            feedback: [],
-                                            rumorsSpent: 0,
-                                            likes: 0,
-                                            isOwnedByUser: false,
-                                            lastStatusUpdate: nil
-                                        ))) {
+                                        NavigationLink(destination: ProjectView(projectId: project.title)) {
                                             ReviewProjectCard(
                                                 title: project.title,
                                                 type: project.type,

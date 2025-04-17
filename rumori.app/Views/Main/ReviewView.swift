@@ -253,7 +253,7 @@ struct ReviewView: View {
         
         return Group {
             if offset == .zero {
-                NavigationLink(destination: ProjectView(project: project)) {
+                NavigationLink(destination: ProjectView(projectId: project.id.uuidString)) {
                     cardContent
                 }
             } else {

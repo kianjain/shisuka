@@ -16,9 +16,13 @@ class ProjectService: ObservableObject {
         
         // Resize image if target size is specified
         if let targetSize = targetSize {
-            let renderer = UIGraphicsImageRenderer(size: targetSize)
+            // Calculate scale to maintain aspect ratio
+            let scale = min(targetSize.width / image.size.width, targetSize.height / image.size.height)
+            let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            
+            let renderer = UIGraphicsImageRenderer(size: newSize)
             finalImage = renderer.image { context in
-                image.draw(in: CGRect(origin: .zero, size: targetSize))
+                image.draw(in: CGRect(origin: .zero, size: newSize))
             }
         }
         
