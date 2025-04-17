@@ -193,13 +193,16 @@ struct UploadView: View {
                             
                             // Image Preview
                             if let imageData = imageData, let uiImage = UIImage(data: imageData) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 200)
-                                    .clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                VStack {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                                .padding(.top, 8)
                             }
                             
                             // Audio File Info
@@ -276,7 +279,7 @@ struct UploadView: View {
                                 (selectedUploadType == .audio && audioData == nil) ? 0.6 : 1.0)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.vertical, 16)
                 }
                 .scrollIndicators(.hidden)
             }
@@ -348,9 +351,9 @@ struct UploadView: View {
     
     private func uploadProject() {
         guard let uploadType = selectedUploadType else { return }
-        
-        isUploading = true
-        
+            
+            isUploading = true
+            
         Task {
             do {
                 let project = try await ProjectService.shared.uploadProject(
