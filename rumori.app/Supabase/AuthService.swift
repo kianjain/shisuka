@@ -21,7 +21,7 @@ class AuthService: ObservableObject {
     private let client = SupabaseManager.shared.client
     
     private init() {
-        Task {
+        Task { @MainActor in
             await checkAuthState()
         }
     }

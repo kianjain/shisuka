@@ -169,7 +169,8 @@ struct ProjectView: View {
                 if let project = project {
                     // Cover image
                     let storage = SupabaseManager.shared.client.storage.from("project_files")
-                    if let imageURL = try? storage.getPublicURL(path: project.imagePath) {
+                    if let imagePath = project.imagePath,
+                       let imageURL = try? storage.getPublicURL(path: imagePath) {
                         ProjectImageView(imageURL: imageURL)
                     }
                     

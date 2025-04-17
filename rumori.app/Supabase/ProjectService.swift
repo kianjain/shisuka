@@ -151,4 +151,72 @@ class ProjectService: ObservableObject {
             throw error
         }
     }
+    
+    @MainActor
+    func updateProjectStatus(_ projectId: UUID, to status: ProjectStatus) async throws {
+        guard let userId = AuthService.shared.currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+        
+        do {
+            _ = try await client
+                .from("projects")
+                .update(["status": status.rawValue])
+                .eq("id", value: projectId)
+                .eq("user_id", value: userId)
+                .execute()
+            
+            print("✅ Project status updated to \(status.rawValue)")
+        } catch {
+            print("❌ [Project] Error updating project status: \(error)")
+            throw error
+        }
+    }
+    
+    @MainActor
+    func deleteProject(_ projectId: UUID) async throws {
+        guard let userId = AuthService.shared.currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+        
+        do {
+            // First get the project to delete its files
+            let response = try await client
+                .from("projects")
+                .select()
+                .eq("id", value: projectId)
+                .eq("user_id", value: userId)
+                .single()
+                .execute()
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let project = try decoder.decode(Project.self, from: response.data)
+            
+            // Delete the project files from storage
+            if let imagePath = project.imagePath {
+                _ = try? await client.storage
+                    .from("project_files")
+                    .remove(paths: [imagePath])
+            }
+            if let audioPath = project.audioPath {
+                _ = try? await client.storage
+                    .from("project_files")
+                    .remove(paths: [audioPath])
+            }
+            
+            // Delete the project record
+            _ = try await client
+                .from("projects")
+                .delete()
+                .eq("id", value: projectId)
+                .eq("user_id", value: userId)
+                .execute()
+            
+            print("✅ Project deleted successfully")
+        } catch {
+            print("❌ [Project] Error deleting project: \(error)")
+            throw error
+        }
+    }
 } 

@@ -19,28 +19,24 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
-            LibraryView()
+            ReviewView()
                 .tabItem {
-                    Image(systemName: "square.stack.3d.up.fill")
-                    Text("Library")
+                    Image(systemName: "rectangle.portrait.on.rectangle.portrait.angled.fill")
+                    Text("Review")
                 }
                 .tag(2)
             
-            ReviewView()
+            LibraryView()
                 .tabItem {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("Review")
+                    Image(systemName: "book.fill")
+                    Text("Library")
                 }
                 .tag(3)
-            
-            ProfileView()
-                .tabItem {
-                    Image(systemName: "person.circle.fill")
-                    Text("Profile")
-                }
-                .tag(4)
         }
         .tint(.white)
+        .toolbarBackground(.hidden, for: .tabBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

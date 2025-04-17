@@ -44,12 +44,26 @@ enum ProjectStatus: String, Codable, CaseIterable {
     }
 }
 
+enum ProjectFilter: String, CaseIterable {
+    case all = "All"
+    case audio = "Audio"
+    case images = "Images"
+    
+    var rawValue: String {
+        switch self {
+        case .all: return "All"
+        case .audio: return "Audio"
+        case .images: return "Images"
+        }
+    }
+}
+
 struct Project: Identifiable, Codable {
     let id: UUID
     let userId: UUID
     let title: String
     let description: String?
-    let imagePath: String
+    let imagePath: String?
     let audioPath: String?
     let createdAt: Date
     let updatedAt: Date
@@ -73,7 +87,7 @@ struct Project: Identifiable, Codable {
         userId = try container.decode(UUID.self, forKey: .userId)
         title = try container.decode(String.self, forKey: .title)
         description = try container.decodeIfPresent(String.self, forKey: .description)
-        imagePath = try container.decode(String.self, forKey: .imagePath)
+        imagePath = try container.decodeIfPresent(String.self, forKey: .imagePath)
         audioPath = try container.decodeIfPresent(String.self, forKey: .audioPath)
         status = try container.decodeIfPresent(ProjectStatus.self, forKey: .status) ?? .active
         

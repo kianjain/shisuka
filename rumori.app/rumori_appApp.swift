@@ -9,6 +9,7 @@ import SwiftUI
 
 @main
 struct rumori_appApp: App {
+    @StateObject private var projectService = ProjectService.shared
     @StateObject private var auth = AuthService.shared
     
     var body: some Scene {
@@ -18,14 +19,18 @@ struct rumori_appApp: App {
                     ProgressView()
                         .progressViewStyle(.circular)
                 } else if auth.isAuthenticated {
-                    ContentView()
+                    MainTabView()
+                        .environmentObject(projectService)
                 } else {
                     SignInView()
                 }
             }
+            .environmentObject(auth)
             .preferredColorScheme(.dark) // Force dark mode
             .onAppear {
-                // Set up any initial app configuration here
+                Task {
+                    await auth.checkAuthState()
+                }
                 setupAppearance()
             }
         }
@@ -55,26 +60,8 @@ struct rumori_appApp: App {
         UINavigationBar.appearance().setBackgroundImage(UIImage(), for: .default)
         UINavigationBar.appearance().shadowImage = UIImage()
         
-        // Configure tab bar appearance
-        let tabBarAppearance = UITabBarAppearance()
-        tabBarAppearance.configureWithTransparentBackground()
-        tabBarAppearance.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-        tabBarAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
-        
-        // Configure text and icon colors for dark mode
-        tabBarAppearance.stackedLayoutAppearance.normal.iconColor = UIColor.white.withAlphaComponent(0.5)
-        tabBarAppearance.stackedLayoutAppearance.selected.iconColor = UIColor.white
-        
-        // Apply the appearance
-        UITabBar.appearance().standardAppearance = tabBarAppearance
-        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
-        
-        // Remove any existing shadow image or color
-        UITabBar.appearance().shadowImage = UIImage()
-        UITabBar.appearance().backgroundImage = UIImage()
-        
-        // Configure tab bar items appearance for dark mode
-        UITabBarItem.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white.withAlphaComponent(0.5)], for: .normal)
-        UITabBarItem.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        // Use default tab bar appearance
+        UITabBar.appearance().standardAppearance = UITabBarAppearance()
+        UITabBar.appearance().scrollEdgeAppearance = UITabBarAppearance()
     }
 }
