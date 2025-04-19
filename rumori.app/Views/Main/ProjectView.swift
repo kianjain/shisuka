@@ -13,7 +13,6 @@ private struct ProjectImageView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(maxWidth: .infinity)
-                        .clipped()
                 } placeholder: {
                     placeholderView
                 }
@@ -156,12 +155,21 @@ private struct FeedbackInputView: View {
 
 // MARK: - Main Project View
 struct ProjectView: View {
-    @StateObject private var projectService = ProjectService.shared
+    let projectId: String
+    let isReviewMode: Bool
+    
     @State private var project: Project?
     @State private var isLoading = true
     @State private var error: Error?
+    @State private var feedbackText = ""
+    @State private var showFeedbackSheet = false
     @State private var isFavorite = false
-    let projectId: String
+    @State private var username: String = "User"
+    
+    init(projectId: String, isReviewMode: Bool = false) {
+        self.projectId = projectId
+        self.isReviewMode = isReviewMode
+    }
     
     var body: some View {
         ZStack {
@@ -183,14 +191,33 @@ struct ProjectView: View {
                         if let imagePath = project.imagePath,
                            let imageURL = try? storage.getPublicURL(path: imagePath) {
                             ProjectImageView(imageURL: imageURL)
+                        } else {
+                            ProjectImageView(imageURL: nil)
                         }
                         
-                        // Project Info (Title and Date)
-                        ProjectInfoView(project: project, isFavorite: $isFavorite)
+                        // Project Info
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(project.title)
+                                .font(.title)
+                                .bold()
+                                .foregroundColor(.white)
+                            
+                            HStack {
+                                Text("by \(username)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                
+                                Spacer()
+                                
+                                Text(project.createdAt.formatted(date: .abbreviated, time: .omitted))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .padding(.horizontal)
                         
-                        // Audio player
+                        // Audio Player
                         if let audioPath = project.audioPath {
-                            let storage = SupabaseManager.shared.client.storage.from("project_files")
                             if let audioURL = try? storage.getPublicURL(path: audioPath) {
                                 AudioPlayerView(audioURL: audioURL)
                                     .padding(.horizontal)
@@ -198,28 +225,66 @@ struct ProjectView: View {
                         }
                         
                         // Description
-                        if let description = project.description {
-                            VStack(alignment: .leading, spacing: 8) {
+                        if let description = project.description, !description.isEmpty {
+                            VStack(alignment: .leading, spacing: 16) {
                                 Text("Description")
                                     .font(.headline)
                                     .foregroundColor(.white)
-                                    .padding(.horizontal)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 
                                 Text(description)
                                     .font(.body)
                                     .foregroundColor(.gray)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(4...)
+                                    .frame(minHeight: 60, alignment: .topLeading)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding()
+                                    .padding(12)
                                     .background(Color(.systemGray6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                                    .padding(.horizontal)
+                                    .cornerRadius(12)
                             }
+                            .padding(.horizontal)
                         }
                         
-                        // Reviews
-                        ReviewsView(feedback: [])
+                        // Feedback or Reviews Section
+                        if isReviewMode {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Your Feedback")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                TextField("Write your feedback...", text: $feedbackText, axis: .vertical)
+                                    .textFieldStyle(PlainTextFieldStyle())
+                                    .foregroundColor(.white)
+                                    .frame(minHeight: 60, alignment: .topLeading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(12)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(12)
+                                
+                                Button(action: {
+                                    showFeedbackSheet = true
+                                }) {
+                                    Text("Submit Feedback")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.black)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color.white, lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
+                                }
+                                .disabled(feedbackText.isEmpty)
+                                .opacity(feedbackText.isEmpty ? 0.6 : 1.0)
+                            }
+                            .padding(.horizontal)
+                        } else {
+                            // Reviews
+                            ReviewsView(feedback: [])
+                        }
                     }
                     .padding(.vertical)
                     .padding(.bottom, 24)
@@ -236,6 +301,38 @@ struct ProjectView: View {
                 await loadProject()
             }
         }
+        .sheet(isPresented: $showFeedbackSheet) {
+            NavigationStack {
+                VStack(spacing: 16) {
+                    Text("Submit Feedback")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                    
+                    TextField("Write your feedback...", text: $feedbackText, axis: .vertical)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    
+                    Button("Submit") {
+                        // TODO: Implement feedback submission
+                        showFeedbackSheet = false
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.white)
+                }
+                .padding()
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Cancel") {
+                            showFeedbackSheet = false
+                        }
+                    }
+                }
+            }
+        }
     }
     
     private func loadProject() async {
@@ -243,6 +340,27 @@ struct ProjectView: View {
             guard let project = try await ProjectService.shared.getProject(byId: projectId) else {
                 print("❌ [Project] Project not found with ID: \(projectId)")
                 return
+            }
+            
+            // Fetch username directly from profiles table
+            let response = try await SupabaseManager.shared.client
+                .from("profiles")
+                .select("username")
+                .eq("id", value: project.userId)
+                .execute()
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            struct ProfileResponse: Codable {
+                let username: String
+            }
+            
+            if let profiles = try? decoder.decode([ProfileResponse].self, from: response.data),
+               let profile = profiles.first {
+                await MainActor.run {
+                    self.username = profile.username
+                }
             }
             
             await MainActor.run {

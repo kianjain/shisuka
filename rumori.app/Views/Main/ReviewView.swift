@@ -310,7 +310,7 @@ struct ReviewView: View {
         
         return Group {
             if offset == .zero {
-                NavigationLink(destination: ProjectView(projectId: project.id.uuidString)) {
+                NavigationLink(destination: ProjectView(projectId: project.id.uuidString, isReviewMode: true)) {
                     cardContent
                 }
                 .buttonStyle(PlainButtonStyle())
