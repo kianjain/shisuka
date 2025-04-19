@@ -352,7 +352,17 @@ struct UploadView: View {
     private func uploadProject() {
         guard let uploadType = selectedUploadType else { return }
             
-            isUploading = true
+        // Check audio file size if it's an audio upload
+        if uploadType == .audio, let audioData = audioData {
+            let fileSizeInMB = Double(audioData.count) / (1024 * 1024)
+            if fileSizeInMB > 5 {
+                showError = true
+                errorMessage = "Audio file is too large. Maximum size is 5MB."
+                return
+            }
+        }
+            
+        isUploading = true
             
         Task {
             do {

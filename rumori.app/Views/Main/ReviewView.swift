@@ -1,4 +1,6 @@
 import SwiftUI
+import Supabase
+import Foundation
 
 struct ReviewView: View {
     @State private var offset: CGSize = .zero
@@ -11,55 +13,11 @@ struct ReviewView: View {
     @State private var showingNotifications = false
     @State private var searchText = ""
     @State private var selectedFilter: String = "All"
-    
-    // Mock data
-    private let mockProjects = [
-        ProjectPreview(
-            id: UUID(),
-            name: "Summer Beat",
-            description: "A fresh electronic track with tropical vibes. Looking for feedback on the mix and arrangement.",
-            fileType: "Audio",
-            author: "MusicMaker",
-            imageUrl: URL(string: "https://example.com/summer-beat-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-7*24*3600),
-            status: .active,
-            feedback: [],
-            rumorsSpent: 0,
-            likes: 12,
-            isOwnedByUser: false,
-            lastStatusUpdate: nil
-        ),
-        ProjectPreview(
-            id: UUID(),
-            name: "Portrait Series",
-            description: "A collection of street photography shots. Need feedback on composition and editing.",
-            fileType: "Images",
-            author: "PhotoArtist",
-            imageUrl: URL(string: "https://example.com/portrait-series-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-14*24*3600),
-            status: .completed,
-            feedback: [],
-            rumorsSpent: 0,
-            likes: 8,
-            isOwnedByUser: false,
-            lastStatusUpdate: nil
-        ),
-        ProjectPreview(
-            id: UUID(),
-            name: "Short Film Draft",
-            description: "A 5-minute drama about family relationships. Looking for feedback on pacing and narrative.",
-            fileType: "Video",
-            author: "FilmStudent",
-            imageUrl: URL(string: "https://example.com/short-film-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-21*24*3600),
-            status: .archived,
-            feedback: [],
-            rumorsSpent: 0,
-            likes: 15,
-            isOwnedByUser: false,
-            lastStatusUpdate: nil
-        )
-    ]
+    @State private var projects: [ProjectPreview] = []
+    @State private var isLoading = true
+    @State private var error: Error?
+    @EnvironmentObject private var projectService: ProjectService
+    @StateObject private var auth = AuthService.shared
     
     var body: some View {
         NavigationStack {
@@ -68,57 +26,86 @@ struct ReviewView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                ScrollView {
-                    if mockProjects.isEmpty {
-                        VStack(spacing: 20) {
-                            Image(systemName: "star.slash")
-                                .font(.system(size: 50))
-                                .foregroundColor(.gray)
-                            Text("No more projects to review")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                            Text("Check back later for new content")
-                                .foregroundColor(.gray)
-                        }
-                        .frame(maxHeight: .infinity)
-                    } else if currentIndex < mockProjects.count {
-                        VStack {
-                            Spacer()
-                                .frame(height: 20)
-                            
-                            projectCard(mockProjects[currentIndex])
-                                .offset(offset)
-                                .rotationEffect(.degrees(Double(offset.width / 20)))
-                                .simultaneousGesture(
-                                    DragGesture()
-                                        .onChanged { gesture in
-                                            offset = gesture.translation
-                                        }
-                                        .onEnded { gesture in
-                                            withAnimation {
-                                                let width = gesture.translation.width
-                                                if abs(width) > 100 {
-                                                    offset = CGSize(
-                                                        width: width > 0 ? 500 : -500,
-                                                        height: 0
-                                                    )
-                                                    currentIndex += 1
-                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                if isLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        if let error = error {
+                            VStack(spacing: 20) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.red)
+                                Text("Error loading projects")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                Text(error.localizedDescription)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if projects.isEmpty {
+                            VStack(spacing: 20) {
+                                Spacer()
+                                VStack(spacing: 20) {
+                                    Image(systemName: "star.slash")
+                                        .font(.system(size: 50))
+                                        .foregroundColor(.gray)
+                                    Text("No more projects to review")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                    Text("Check back later for new content")
+                                        .foregroundColor(.gray)
+                                }
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if currentIndex < projects.count {
+                            VStack {
+                                Spacer()
+                                    .frame(height: UIScreen.main.bounds.height * 0.10)
+                                
+                                projectCard(projects[currentIndex])
+                                    .offset(offset)
+                                    .rotationEffect(.degrees(Double(offset.width / 20)))
+                                    .simultaneousGesture(
+                                        DragGesture()
+                                            .onChanged { gesture in
+                                                offset = gesture.translation
+                                            }
+                                            .onEnded { gesture in
+                                                withAnimation {
+                                                    let width = gesture.translation.width
+                                                    if abs(width) > 100 {
+                                                        offset = CGSize(
+                                                            width: width > 0 ? 500 : -500,
+                                                            height: 0
+                                                        )
+                                                        currentIndex += 1
+                                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                            offset = .zero
+                                                        }
+                                                    } else {
                                                         offset = .zero
                                                     }
-                                                } else {
-                                                    offset = .zero
                                                 }
                                             }
-                                        }
-                                )
-                            
-                            Spacer()
+                                    )
+                                
+                                Spacer()
+                                    .frame(height: UIScreen.main.bounds.height * 0.05)
+                            }
                         }
                     }
+                    .scrollIndicators(.hidden)
+                    .padding(.top, topBarHeight)
                 }
-                .scrollIndicators(.hidden)
-                .padding(.top, topBarHeight)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -163,6 +150,77 @@ struct ReviewView: View {
                 ActivityView()
             }
         }
+        .onAppear {
+            loadProjects()
+        }
+    }
+    
+    private func loadProjects() {
+        isLoading = true
+        error = nil
+        
+        Task {
+            do {
+                let projects = try await projectService.getProjectsForReview()
+                var projectPreviews: [ProjectPreview] = []
+                
+                for project in projects {
+                    // Determine file type based on available paths
+                    let fileType = project.audioPath != nil ? "Audio" : "Images"
+                    
+                    // Fetch the author's profile
+                    let authorName = try? await fetchAuthorName(userId: project.userId)
+                    
+                    let preview = ProjectPreview(
+                        id: project.id,
+                        name: project.title,
+                        description: project.description ?? "",
+                        fileType: fileType,
+                        author: authorName ?? "User",
+                        imageUrl: project.imagePath.map { path in
+                            try? SupabaseManager.shared.client.storage
+                                .from("project_files")
+                                .getPublicURL(path: path)
+                        } ?? nil,
+                        uploadDate: project.createdAt,
+                        status: project.status,
+                        feedback: [],
+                        rumorsSpent: 0,
+                        likes: 0,
+                        isOwnedByUser: false,
+                        lastStatusUpdate: project.updatedAt
+                    )
+                    projectPreviews.append(preview)
+                }
+                
+                self.projects = projectPreviews
+                isLoading = false
+            } catch {
+                self.error = error
+                isLoading = false
+            }
+        }
+    }
+    
+    private func fetchAuthorName(userId: UUID) async throws -> String? {
+        let response = try await SupabaseManager.shared.client
+            .from("profiles")
+            .select("username")
+            .eq("id", value: userId)
+            .execute()
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        struct ProfileResponse: Codable {
+            let username: String
+        }
+        
+        if let profiles = try? decoder.decode([ProfileResponse].self, from: response.data),
+           let profile = profiles.first {
+            return profile.username
+        }
+        return nil
     }
     
     private func projectCard(_ project: ProjectPreview) -> some View {
@@ -202,62 +260,64 @@ struct ReviewView: View {
             }
             
             // Project Info
-            VStack(alignment: .leading, spacing: 16) {
-                // Project Type Badge
-                Text(project.fileType)
-                    .font(.subheadline)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemGray5))
+            VStack(alignment: .leading, spacing: 12) {
+                Text(project.name)
+                    .font(.title3)
+                    .bold()
                     .foregroundColor(.white)
-                    .cornerRadius(8)
-                    .padding(.top, 16)
+                    .lineLimit(2)
                 
-                // Project Title and Author
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(project.name)
-                        .font(.title)
-                        .bold()
-                        .foregroundColor(.white)
-                    Text("by \(project.author)")
+                // File Type
+                HStack {
+                    Image(systemName: getFileTypeIcon(for: project.fileType))
+                        .foregroundColor(.gray)
+                    Text(project.fileType)
                         .font(.subheadline)
                         .foregroundColor(.gray)
                 }
                 
                 // Description
-                Text(project.description)
-                    .font(.body)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(3)
-                    .padding(.top, 8)
+                if !project.description.isEmpty {
+                    Text(project.description)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .lineLimit(3)
+                        .frame(maxHeight: 60)
+                }
+                
+                HStack {
+                    Text("by \(project.author)")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    Text(project.uploadDate.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
+            .padding(16)
             .background(Color(.systemGray6))
         }
-        .frame(maxWidth: 340)
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .frame(width: 340)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.3), radius: 10, x: 0, y: 4)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(
-                    Color.white.opacity(0.3),
-                    lineWidth: 0.5
-                )
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.3), radius: 8, x: -2, y: 2)
-        .shadow(color: Color.white.opacity(0.3), radius: 8, x: 2, y: -2)
-        .padding(.horizontal, 24.0)
-        .padding(.vertical, 8)
         
         return Group {
             if offset == .zero {
                 NavigationLink(destination: ProjectView(projectId: project.id.uuidString)) {
                     cardContent
                 }
+                .buttonStyle(PlainButtonStyle())
             } else {
                 cardContent
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         }
     }

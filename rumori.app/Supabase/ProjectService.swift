@@ -43,6 +43,8 @@ class ProjectService: ObservableObject {
             throw AuthError.notAuthenticated
         }
         
+        print("📝 Starting project upload for user: \(userId)")
+        
         // Generate unique filenames using timestamp
         let timestamp = Int(Date().timeIntervalSince1970)
         var imageFilePath: String?
@@ -81,6 +83,7 @@ class ProjectService: ObservableObject {
                 let audio_path: String?
                 let created_at: String
                 let updated_at: String
+                let status: String
             }
             
             let projectData = ProjectData(
@@ -90,7 +93,8 @@ class ProjectService: ObservableObject {
                 image_path: imageFilePath,
                 audio_path: audioFilePath,
                 created_at: ISO8601DateFormatter().string(from: Date()),
-                updated_at: ISO8601DateFormatter().string(from: Date())
+                updated_at: ISO8601DateFormatter().string(from: Date()),
+                status: ProjectStatus.active.rawValue
             )
             
             print("📝 Creating project record with data: \(projectData)")
@@ -102,11 +106,13 @@ class ProjectService: ObservableObject {
                 .single()
                 .execute()
             
+            print("📝 Raw response data: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             
             let project = try decoder.decode(Project.self, from: response.data)
-            print("✅ Project created successfully: \(project.title)")
+            print("✅ Project created successfully: \(project.title), status: \(project.status.rawValue)")
             return project
             
         } catch {
@@ -148,6 +154,67 @@ class ProjectService: ObservableObject {
             
         } catch {
             print("❌ [Project] Error fetching projects: \(error)")
+            throw error
+        }
+    }
+    
+    @MainActor
+    func getProjectsForReview() async throws -> [Project] {
+        guard let userId = AuthService.shared.currentUser?.id else {
+            print("❌ [Project] No authenticated user found")
+            throw AuthError.notAuthenticated
+        }
+        
+        print("🔍 [Project] Current user ID for review: \(userId)")
+        print("🔍 [Project] Current user email: \(AuthService.shared.currentUser?.email ?? "unknown")")
+        
+        do {
+            // First, let's check what projects exist in the database
+            let allProjectsResponse = try await client
+                .from("projects")
+                .select()
+                .execute()
+            
+            print("🔍 [Project] All projects in database: \(String(data: allProjectsResponse.data, encoding: .utf8) ?? "nil")")
+            
+            // Now get projects for review
+            let response = try await client
+                .from("projects")
+                .select()
+                .neq("user_id", value: userId)
+                .ilike("status", pattern: ProjectStatus.active.rawValue)
+                .order("created_at", ascending: false)
+                .execute()
+            
+            print("🔍 [Project] Raw response data for review: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
+            // Check if the response is empty
+            if response.data.isEmpty {
+                print("⚠️ [Project] No projects found in the database")
+                return []
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            do {
+                let projects = try decoder.decode([Project].self, from: response.data)
+                print("🔍 [Project] Found \(projects.count) projects for review")
+                
+                // Print details of each project found
+                for project in projects {
+                    print("🔍 [Project] Review project: \(project.title), user_id: \(project.userId), status: \(project.status.rawValue)")
+                }
+                
+                return projects
+            } catch {
+                print("❌ [Project] Error decoding projects: \(error)")
+                print("❌ [Project] Raw data that failed to decode: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+                throw error
+            }
+            
+        } catch {
+            print("❌ [Project] Error fetching projects for review: \(error)")
             throw error
         }
     }
@@ -216,6 +283,27 @@ class ProjectService: ObservableObject {
             print("✅ Project deleted successfully")
         } catch {
             print("❌ [Project] Error deleting project: \(error)")
+            throw error
+        }
+    }
+    
+    @MainActor
+    func getProject(byId projectId: String) async throws -> Project? {
+        do {
+            let response = try await client
+                .from("projects")
+                .select()
+                .eq("id", value: projectId)
+                .single()
+                .execute()
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let project = try decoder.decode(Project.self, from: response.data)
+            return project
+        } catch {
+            print("❌ [Project] Error fetching project by ID: \(error)")
             throw error
         }
     }

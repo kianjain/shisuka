@@ -164,77 +164,95 @@ struct ProjectView: View {
     let projectId: String
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                if let project = project {
-                    // Cover image
-                    let storage = SupabaseManager.shared.client.storage.from("project_files")
-                    if let imagePath = project.imagePath,
-                       let imageURL = try? storage.getPublicURL(path: imagePath) {
-                        ProjectImageView(imageURL: imageURL)
-                    }
-                    
-                    // Project Info (Title and Date)
-                    ProjectInfoView(project: project, isFavorite: $isFavorite)
-                    
-                    // Audio player
-                    if let audioPath = project.audioPath {
-                        let storage = SupabaseManager.shared.client.storage.from("project_files")
-                        if let audioURL = try? storage.getPublicURL(path: audioPath) {
-                            AudioPlayerView(audioURL: audioURL)
-                                .padding(.horizontal)
-                        }
-                    }
-                    
-                    // Description
-                    if let description = project.description {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Description")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal)
-                            
-                            Text(description)
-                                .font(.body)
-                                .foregroundColor(.gray)
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(4...)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .padding(.horizontal)
-                        }
-                    }
-                    
-                    // Reviews
-                    ReviewsView(feedback: [])
-                } else if isLoading {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+            
+            if isLoading {
+                VStack {
+                    Spacer()
                     ProgressView()
-                } else if let error = error {
-                    Text("Error: \(error.localizedDescription)")
-                        .foregroundColor(.red)
+                    Spacer()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let project = project {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Cover image
+                        let storage = SupabaseManager.shared.client.storage.from("project_files")
+                        if let imagePath = project.imagePath,
+                           let imageURL = try? storage.getPublicURL(path: imagePath) {
+                            ProjectImageView(imageURL: imageURL)
+                        }
+                        
+                        // Project Info (Title and Date)
+                        ProjectInfoView(project: project, isFavorite: $isFavorite)
+                        
+                        // Audio player
+                        if let audioPath = project.audioPath {
+                            let storage = SupabaseManager.shared.client.storage.from("project_files")
+                            if let audioURL = try? storage.getPublicURL(path: audioPath) {
+                                AudioPlayerView(audioURL: audioURL)
+                                    .padding(.horizontal)
+                            }
+                        }
+                        
+                        // Description
+                        if let description = project.description {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Description")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal)
+                                
+                                Text(description)
+                                    .font(.body)
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(4...)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding()
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                    .padding(.horizontal)
+                            }
+                        }
+                        
+                        // Reviews
+                        ReviewsView(feedback: [])
+                    }
+                    .padding(.vertical)
+                    .padding(.bottom, 24)
+                }
+            } else if let error = error {
+                Text("Error: \(error.localizedDescription)")
+                    .foregroundColor(.red)
             }
-            .padding(.vertical)
-            .padding(.bottom, 24)
         }
-        .background(Color.black.ignoresSafeArea())
         .navigationBarHidden(true)
         .scrollIndicators(.hidden)
         .onAppear {
-            loadProject()
+            Task {
+                await loadProject()
+            }
         }
     }
     
-    private func loadProject() {
-        Task {
-            do {
-                project = try await projectService.getProjects().first { $0.id.uuidString == projectId }
-                isLoading = false
-            } catch {
-                self.error = error
-                isLoading = false
+    private func loadProject() async {
+        do {
+            guard let project = try await ProjectService.shared.getProject(byId: projectId) else {
+                print("❌ [Project] Project not found with ID: \(projectId)")
+                return
+            }
+            
+            await MainActor.run {
+                self.project = project
+                self.isLoading = false
+            }
+        } catch {
+            print("❌ [Project] Error loading project: \(error)")
+            await MainActor.run {
+                self.isLoading = false
             }
         }
     }
