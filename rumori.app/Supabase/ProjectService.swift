@@ -307,4 +307,40 @@ class ProjectService: ObservableObject {
             throw error
         }
     }
+    
+    @MainActor
+    func updateProjectTitle(id: UUID, title: String) async throws {
+        let response = try await client
+            .from("projects")
+            .update([
+                "title": title,
+                "updated_at": ISO8601DateFormatter().string(from: Date())
+            ])
+            .eq("id", value: id)
+            .execute()
+        
+        if response.status != 200 {
+            throw NSError(domain: "ProjectService", code: response.status, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to update project title"
+            ])
+        }
+    }
+    
+    @MainActor
+    func updateProjectDescription(id: UUID, description: String) async throws {
+        let response = try await client
+            .from("projects")
+            .update([
+                "description": description,
+                "updated_at": ISO8601DateFormatter().string(from: Date())
+            ])
+            .eq("id", value: id)
+            .execute()
+        
+        if response.status != 200 {
+            throw NSError(domain: "ProjectService", code: response.status, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to update project description"
+            ])
+        }
+    }
 } 

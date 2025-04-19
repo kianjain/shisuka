@@ -216,102 +216,99 @@ struct LibraryView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                if isLoading {
-                    VStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filteredProjects.isEmpty {
-                    VStack(spacing: 16) {
-                        Spacer()
-                        VStack(spacing: 16) {
-                            Image(systemName: "doc.text.magnifyingglass")
-                                .font(.system(size: 40))
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Search Bar
+                        HStack {
+                            Image(systemName: "magnifyingglass")
                                 .foregroundColor(.gray)
-                            Text("No projects found")
-                                .font(.headline)
+                            
+                            TextField("Search projects...", text: $searchText)
+                                .textFieldStyle(PlainTextFieldStyle())
                                 .foregroundColor(.white)
+                            
                             if !searchText.isEmpty {
-                                Text("Try adjusting your search")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                            } else {
-                                Text("Upload your first project to get started")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                Button(action: { searchText = "" }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.gray)
+                                }
                             }
                         }
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        VStack(spacing: 24) {
-                            // Search Bar
-                            HStack {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundColor(.gray)
-                                
-                                TextField("Search projects...", text: $searchText)
-                                    .textFieldStyle(PlainTextFieldStyle())
-                                    .foregroundColor(.white)
-                                
-                                if !searchText.isEmpty {
-                                    Button(action: { searchText = "" }) {
-                                        Image(systemName: "xmark.circle.fill")
+                        .padding(12)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(100)
+                        .padding(.horizontal)
+                        
+                        // Filter Pills
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(filters, id: \.self) { filter in
+                                    filterPill(filter)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        
+                        if isLoading {
+                            VStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if filteredProjects.isEmpty {
+                            VStack(spacing: 16) {
+                                Spacer()
+                                VStack(spacing: 16) {
+                                    Image(systemName: "doc.text.magnifyingglass")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.gray)
+                                    Text("No projects found")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    if !searchText.isEmpty {
+                                        Text("Try adjusting your search")
+                                            .font(.subheadline)
+                                            .foregroundColor(.gray)
+                                    } else {
+                                        Text("Upload your first project to get started")
+                                            .font(.subheadline)
                                             .foregroundColor(.gray)
                                     }
                                 }
+                                Spacer()
                             }
-                            .padding(12)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(100)
-                            .padding(.horizontal)
-                            
-                            // Filter Pills
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(filters, id: \.self) { filter in
-                                        filterPill(filter)
-                                    }
+                            .frame(maxWidth: .infinity, minHeight: UIScreen.main.bounds.height * 0.6)
+                        } else if let error = error {
+                            VStack(spacing: 16) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.red)
+                                Text("Error loading projects")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text(error.localizedDescription)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.center)
+                                Button("Try Again") {
+                                    loadProjects()
                                 }
-                                .padding(.horizontal)
+                                .buttonStyle(.bordered)
+                                .tint(.white)
                             }
-                            
-                            // Projects List
-                            if let error = error {
-                                VStack(spacing: 16) {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.red)
-                                    Text("Error loading projects")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                    Text(error.localizedDescription)
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                        .multilineTextAlignment(.center)
-                                    Button("Try Again") {
-                                        loadProjects()
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .tint(.white)
-                                }
-                                .padding()
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            } else {
-                                LazyVStack(spacing: 16) {
-                                    ForEach(filteredProjects) { project in
-                                        ProjectCard(project: project)
-                                            .padding(.horizontal)
-                                    }
+                            .padding()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            LazyVStack(spacing: 16) {
+                                ForEach(filteredProjects) { project in
+                                    ProjectCard(project: project)
+                                        .padding(.horizontal)
                                 }
                             }
                         }
-                        .padding(.vertical, 8.0)
                     }
+                    .padding(.vertical, 8.0)
                 }
             }
             .navigationTitle("Library")
@@ -384,7 +381,7 @@ struct LibraryView: View {
                 .padding(.vertical, 8)
                 .background(selectedFilter == filter ? Color.white : Color(.systemGray6))
                 .foregroundColor(selectedFilter == filter ? .black : .white)
-                .cornerRadius(16)
+                .cornerRadius(100)
         }
     }
     

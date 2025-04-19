@@ -40,29 +40,52 @@ private struct ProjectImageView: View {
 // MARK: - Project Info View
 private struct ProjectInfoView: View {
     let project: Project
-    @Binding var isFavorite: Bool
+    let isReviewMode: Bool
+    @Binding var isEditingTitle: Bool
+    @Binding var editedTitle: String
+    @FocusState var isTitleFocused: Bool
+    let onTitleUpdate: () -> Void
+    let username: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header with Favorite Button
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(project.title)
+        VStack(alignment: .leading, spacing: 8) {
+            // Title
+            if isEditingTitle {
+                TextField("Project Title", text: $editedTitle)
+                    .textFieldStyle(.plain)
                         .font(.title)
                         .bold()
                         .foregroundColor(.white)
-                    Text("Added \(project.createdAt.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
+                    .focused($isTitleFocused)
+                    .onSubmit {
+                        onTitleUpdate()
+                    }
+                    .onAppear {
+                        isTitleFocused = true
+                    }
+            } else {
+                Text(project.title)
+                    .font(.title)
+                    .bold()
+                    .foregroundColor(.white)
+                    .onTapGesture {
+                        if !isReviewMode {
+                            editedTitle = project.title
+                            isEditingTitle = true
+                        }
+                    }
+            }
+            
+            HStack {
+                Text("by \(username)")
+                .font(.subheadline)
+                .foregroundColor(.gray)
                 
                 Spacer()
                 
-                Button(action: { isFavorite.toggle() }) {
-                    Image(systemName: isFavorite ? "star.fill" : "star")
-                        .font(.title2)
-                        .foregroundColor(isFavorite ? .yellow : .gray)
-                }
+                Text(project.createdAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption)
+                        .foregroundColor(.gray)
             }
         }
         .padding(.horizontal)
@@ -166,6 +189,14 @@ struct ProjectView: View {
     @State private var isFavorite = false
     @State private var username: String = "User"
     
+    // Editing states
+    @State private var isEditingTitle = false
+    @State private var isEditingDescription = false
+    @State private var editedTitle: String = ""
+    @State private var editedDescription: String = ""
+    @FocusState private var isTitleFocused: Bool
+    @FocusState private var isDescriptionFocused: Bool
+    
     init(projectId: String, isReviewMode: Bool = false) {
         self.projectId = projectId
         self.isReviewMode = isReviewMode
@@ -184,8 +215,8 @@ struct ProjectView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let project = project {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+        ScrollView {
+            VStack(spacing: 24) {
                         // Cover image
                         let storage = SupabaseManager.shared.client.storage.from("project_files")
                         if let imagePath = project.imagePath,
@@ -196,25 +227,19 @@ struct ProjectView: View {
                         }
                         
                         // Project Info
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(project.title)
-                                .font(.title)
-                                .bold()
-                                .foregroundColor(.white)
-                            
-                            HStack {
-                                Text("by \(username)")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                
-                                Spacer()
-                                
-                                Text(project.createdAt.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        .padding(.horizontal)
+                        ProjectInfoView(
+                            project: project,
+                            isReviewMode: isReviewMode,
+                            isEditingTitle: $isEditingTitle,
+                            editedTitle: $editedTitle,
+                            isTitleFocused: _isTitleFocused,
+                            onTitleUpdate: {
+                                Task {
+                                    await updateProjectTitle()
+                                }
+                            },
+                            username: username
+                        )
                         
                         // Audio Player
                         if let audioPath = project.audioPath {
@@ -232,14 +257,33 @@ struct ProjectView: View {
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 
-                                Text(description)
-                                    .font(.body)
-                                    .foregroundColor(.gray)
-                                    .frame(minHeight: 60, alignment: .topLeading)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(12)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(12)
+                                if isEditingDescription {
+                                    TextField("Project Description", text: $editedDescription, axis: .vertical)
+                                        .textFieldStyle(.plain)
+                                        .font(.body)
+                                        .foregroundColor(.gray)
+                                        .focused($isDescriptionFocused)
+                                        .lineLimit(nil)
+                                        .onSubmit {
+                                            Task {
+                                                await updateProjectDescription()
+                                            }
+                                        }
+                                        .onAppear {
+                                            isDescriptionFocused = true
+                                        }
+                                } else {
+                                    Text(description)
+                                        .font(.body)
+                                        .foregroundColor(.gray)
+                                        .lineLimit(nil)
+                                        .onTapGesture {
+                                            if !isReviewMode {
+                                                editedDescription = description
+                                                isEditingDescription = true
+                                            }
+                                        }
+                                }
                             }
                             .padding(.horizontal)
                         }
@@ -281,7 +325,7 @@ struct ProjectView: View {
                                 .opacity(feedbackText.isEmpty ? 0.6 : 1.0)
                             }
                             .padding(.horizontal)
-                        } else {
+                } else {
                             // Reviews
                             ReviewsView(feedback: [])
                         }
@@ -342,7 +386,7 @@ struct ProjectView: View {
                 return
             }
             
-            // Fetch username directly from profiles table
+            // Fetch username
             let response = try await SupabaseManager.shared.client
                 .from("profiles")
                 .select("username")
@@ -372,6 +416,58 @@ struct ProjectView: View {
             await MainActor.run {
                 self.isLoading = false
             }
+        }
+    }
+    
+    private func updateProjectTitle() async {
+        guard let project = project else { return }
+        do {
+            try await ProjectService.shared.updateProjectTitle(
+                id: project.id,
+                title: editedTitle
+            )
+            await MainActor.run {
+                self.project = Project(
+                    id: project.id,
+                    userId: project.userId,
+                    title: editedTitle,
+                    description: project.description,
+                    imagePath: project.imagePath,
+                    audioPath: project.audioPath,
+                    createdAt: project.createdAt,
+                    updatedAt: Date(),
+                    status: project.status
+                )
+                self.isEditingTitle = false
+            }
+        } catch {
+            print("❌ [Project] Error updating title: \(error)")
+        }
+    }
+    
+    private func updateProjectDescription() async {
+        guard let project = project else { return }
+        do {
+            try await ProjectService.shared.updateProjectDescription(
+                id: project.id,
+                description: editedDescription
+            )
+            await MainActor.run {
+                self.project = Project(
+                    id: project.id,
+                    userId: project.userId,
+                    title: project.title,
+                    description: editedDescription,
+                    imagePath: project.imagePath,
+                    audioPath: project.audioPath,
+                    createdAt: project.createdAt,
+                    updatedAt: Date(),
+                    status: project.status
+                )
+                self.isEditingDescription = false
+            }
+        } catch {
+            print("❌ [Project] Error updating description: \(error)")
         }
     }
 }

@@ -34,77 +34,130 @@ struct ReviewView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    ScrollView {
-                        if let error = error {
-                            VStack(spacing: 20) {
+                    if let error = error {
+                        VStack(spacing: 16) {
+                            Spacer()
+                            VStack(spacing: 16) {
                                 Image(systemName: "exclamationmark.triangle")
-                                    .font(.system(size: 50))
+                                    .font(.system(size: 40))
                                     .foregroundColor(.red)
                                 Text("Error loading projects")
-                                    .font(.title2)
+                                    .font(.headline)
                                     .foregroundColor(.white)
                                 Text(error.localizedDescription)
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
                                     .multilineTextAlignment(.center)
-                                    .padding(.horizontal)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if projects.isEmpty {
-                            VStack(spacing: 20) {
-                                Spacer()
-                                VStack(spacing: 20) {
-                                    Image(systemName: "star.slash")
-                                        .font(.system(size: 50))
-                                        .foregroundColor(.gray)
-                                    Text("No more projects to review")
-                                        .font(.title2)
-                                        .foregroundColor(.white)
-                                    Text("Check back later for new content")
-                                        .foregroundColor(.gray)
+                                Button("Try Again") {
+                                    loadProjects()
                                 }
-                                Spacer()
+                                .buttonStyle(.bordered)
+                                .tint(.white)
                             }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if currentIndex < projects.count {
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if projects.isEmpty {
+                        VStack(spacing: 16) {
+                            Spacer()
+                            VStack(spacing: 16) {
+                                Image(systemName: "rectangle.portrait.on.rectangle.portrait.slash")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.gray)
+                                Text("No more projects to review")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("Check back later for new content")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if currentIndex >= projects.count {
+                        VStack(spacing: 16) {
+                            Spacer()
+                            VStack(spacing: 16) {
+                                Image(systemName: "rectangle.portrait.on.rectangle.portrait.slash")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.gray)
+                                Text("No more projects to review")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("Check back later for new content")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
                             VStack {
                                 Spacer()
                                     .frame(height: UIScreen.main.bounds.height * 0.10)
                                 
                                 projectCard(projects[currentIndex])
                                     .offset(offset)
-                                    .rotationEffect(.degrees(Double(offset.width / 20)))
+                                    .rotationEffect(.degrees(Double(offset.width / 40)))
+                                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.3), value: offset)
                                     .simultaneousGesture(
                                         DragGesture()
                                             .onChanged { gesture in
-                                                offset = gesture.translation
+                                                // Only apply horizontal movement
+                                                offset = CGSize(width: gesture.translation.width, height: 0)
                                             }
                                             .onEnded { gesture in
-                                                withAnimation {
-                                                    let width = gesture.translation.width
-                                                    if abs(width) > 100 {
+                                                let width = gesture.translation.width
+                                                let velocity = gesture.predictedEndLocation.x - gesture.location.x
+                                                
+                                                if abs(width) > 150 || abs(velocity) > 500 {
+                                                    let direction: CGFloat = (width + velocity) > 0 ? 1 : -1
+                                                    withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.3)) {
                                                         offset = CGSize(
-                                                            width: width > 0 ? 500 : -500,
+                                                            width: direction * 500,
                                                             height: 0
                                                         )
-                                                        currentIndex += 1
-                                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                    }
+                                                    currentIndex += 1
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.3)) {
                                                             offset = .zero
                                                         }
-                                                    } else {
+                                                    }
+                                                } else {
+                                                    withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.3)) {
                                                         offset = .zero
                                                     }
                                                 }
                                             }
                                     )
+                                    .onTapGesture {
+                                        if offset == .zero {
+                                            // Navigate to project view
+                                            let project = projects[currentIndex]
+                                            let projectView = ProjectView(projectId: project.id.uuidString, isReviewMode: true)
+                                            let hostingController = UIHostingController(rootView: 
+                                                VStack(spacing: 0) {
+                                                    
+                                                    projectView
+                                                }
+                                                .background(Color.black)
+                                            )
+                                            hostingController.modalPresentationStyle = .pageSheet
+                                            UIApplication.shared.windows.first?.rootViewController?.present(hostingController, animated: true)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 20)
                                 
                                 Spacer()
                                     .frame(height: UIScreen.main.bounds.height * 0.05)
                             }
                         }
+                        .scrollIndicators(.hidden)
+                        .padding(.top, topBarHeight)
                     }
-                    .scrollIndicators(.hidden)
-                    .padding(.top, topBarHeight)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -308,18 +361,7 @@ struct ReviewView: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
         
-        return Group {
-            if offset == .zero {
-                NavigationLink(destination: ProjectView(projectId: project.id.uuidString, isReviewMode: true)) {
-                    cardContent
-                }
-                .buttonStyle(PlainButtonStyle())
-            } else {
-                cardContent
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-        }
+        return cardContent
     }
     
     private func getFileTypeIcon(for fileType: String) -> String {

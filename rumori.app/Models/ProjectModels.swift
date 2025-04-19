@@ -81,6 +81,18 @@ struct Project: Identifiable, Codable {
         case status
     }
     
+    init(id: UUID, userId: UUID, title: String, description: String?, imagePath: String?, audioPath: String?, createdAt: Date, updatedAt: Date, status: ProjectStatus = .active) {
+        self.id = id
+        self.userId = userId
+        self.title = title
+        self.description = description
+        self.imagePath = imagePath
+        self.audioPath = audioPath
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.status = status
+    }
+    
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
