@@ -497,7 +497,6 @@ struct HomeView: View {
                     id: UUID(),
                     author: "PhotoCritic",
                     comment: "The composition is excellent, especially in the urban environment shots. The contrast could be slightly increased in some images.",
-                    rating: 1,
                     date: Date().addingTimeInterval(-5*24*3600)
                 )
             ],

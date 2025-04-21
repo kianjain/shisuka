@@ -94,7 +94,7 @@ private struct ProjectInfoView: View {
 
 // MARK: - Reviews View
 private struct ReviewsView: View {
-    let feedback: [Feedback]
+    let feedback: [FeedbackResponse]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -109,15 +109,17 @@ private struct ReviewsView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
             } else {
-                ForEach(feedback, id: \.id) { review in
+                ForEach(feedback) { review in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text(review.author)
+                            Text(review.author.username)
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundColor(.white)
+                            
                             Spacer()
-                            Text(review.date.formatted(date: .abbreviated, time: .omitted))
+                            
+                            Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -179,15 +181,20 @@ private struct FeedbackInputView: View {
 // MARK: - Main Project View
 struct ProjectView: View {
     let projectId: String
-    let isReviewMode: Bool
     
     @State private var project: Project?
     @State private var isLoading = true
     @State private var error: Error?
-    @State private var feedbackText = ""
-    @State private var showFeedbackSheet = false
-    @State private var isFavorite = false
     @State private var username: String = "User"
+    @State private var isOwnedByUser: Bool = false
+    
+    // Feedback states
+    @State private var feedbackText = ""
+    @State private var isSubmittingFeedback = false
+    @State private var feedbackError: Error?
+    @State private var showFeedbackError = false
+    @State private var projectFeedback: [FeedbackResponse] = []
+    @State private var isFeedbackLoading = true
     
     // Editing states
     @State private var isEditingTitle = false
@@ -197,145 +204,157 @@ struct ProjectView: View {
     @FocusState private var isTitleFocused: Bool
     @FocusState private var isDescriptionFocused: Bool
     
-    init(projectId: String, isReviewMode: Bool = false) {
+    init(projectId: String) {
         self.projectId = projectId
-        self.isReviewMode = isReviewMode
     }
     
     var body: some View {
         ZStack {
+            // Background
             Color.black
                 .ignoresSafeArea()
             
             if isLoading {
-                VStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+            } else if let error = error {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 50))
+                        .foregroundColor(.gray)
+                    Text("Error loading project")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                    Text(error.localizedDescription)
+                        .foregroundColor(.gray)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let project = project {
+            } else {
         ScrollView {
             VStack(spacing: 24) {
-                        // Cover image
-                        let storage = SupabaseManager.shared.client.storage.from("project_files")
-                        if let imagePath = project.imagePath,
-                           let imageURL = try? storage.getPublicURL(path: imagePath) {
-                            ProjectImageView(imageURL: imageURL)
-                        } else {
-                            ProjectImageView(imageURL: nil)
-                        }
-                        
-                        // Project Info
-                        ProjectInfoView(
-                            project: project,
-                            isReviewMode: isReviewMode,
-                            isEditingTitle: $isEditingTitle,
-                            editedTitle: $editedTitle,
-                            isTitleFocused: _isTitleFocused,
-                            onTitleUpdate: {
-                                Task {
-                                    await updateProjectTitle()
-                                }
-                            },
-                            username: username
-                        )
-                        
-                        // Audio Player
-                        if let audioPath = project.audioPath {
-                            if let audioURL = try? storage.getPublicURL(path: audioPath) {
+                        if let project = project {
+                            // Cover image
+                            let storage = SupabaseManager.shared.client.storage.from("project_files")
+                            if let imagePath = project.imagePath,
+                               let imageURL = try? storage.getPublicURL(path: imagePath) {
+                                ProjectImageView(imageURL: imageURL)
+                            } else {
+                                ProjectImageView(imageURL: nil)
+                            }
+                            
+                            ProjectInfoView(
+                                project: project,
+                                isReviewMode: false,
+                                isEditingTitle: $isEditingTitle,
+                                editedTitle: $editedTitle,
+                                isTitleFocused: _isTitleFocused,
+                                onTitleUpdate: {
+                                    Task {
+                                        await updateProjectTitle()
+                                    }
+                                },
+                                username: username
+                            )
+                            
+                            // Audio Player
+                            if let audioPath = project.audioPath,
+                               let audioURL = try? storage.getPublicURL(path: audioPath) {
                                 AudioPlayerView(audioURL: audioURL)
                                     .padding(.horizontal)
                             }
-                        }
-                        
-                        // Description
-                        if let description = project.description, !description.isEmpty {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Description")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                
-                                if isEditingDescription {
-                                    TextField("Project Description", text: $editedDescription, axis: .vertical)
-                                        .textFieldStyle(.plain)
-                                        .font(.body)
-                                        .foregroundColor(.gray)
-                                        .focused($isDescriptionFocused)
-                                        .lineLimit(nil)
-                                        .onSubmit {
-                                            Task {
-                                                await updateProjectDescription()
-                                            }
-                                        }
-                                        .onAppear {
-                                            isDescriptionFocused = true
-                                        }
-                                } else {
-                                    Text(description)
-                                        .font(.body)
-                                        .foregroundColor(.gray)
-                                        .lineLimit(nil)
-                                        .onTapGesture {
-                                            if !isReviewMode {
-                                                editedDescription = description
-                                                isEditingDescription = true
-                                            }
-                                        }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        
-                        // Feedback or Reviews Section
-                        if isReviewMode {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Your Feedback")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                
-                                TextField("Write your feedback...", text: $feedbackText, axis: .vertical)
-                                    .textFieldStyle(PlainTextFieldStyle())
-                                    .foregroundColor(.white)
-                                    .frame(minHeight: 60, alignment: .topLeading)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(12)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(12)
-                                
-                                Button(action: {
-                                    showFeedbackSheet = true
-                                }) {
-                                    Text("Submit Feedback")
+                            
+                            // Description
+                            if let description = project.description, !description.isEmpty {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    Text("Description")
                                         .font(.headline)
                                         .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.black)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(Color.white, lineWidth: 1)
-                                        )
-                                        .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    
+                                    if isEditingDescription {
+                                        TextField("Project Description", text: $editedDescription, axis: .vertical)
+                                            .textFieldStyle(.plain)
+                                            .font(.body)
+                                            .foregroundColor(.gray)
+                                            .focused($isDescriptionFocused)
+                                            .lineLimit(nil)
+                                            .onSubmit {
+                                                Task {
+                                                    await updateProjectDescription()
+                                                }
+                                            }
+                                    } else {
+                                        Text(description)
+                                            .font(.body)
+                                            .foregroundColor(.gray)
+                                            .lineLimit(nil)
+                                            .onTapGesture {
+                                                if isOwnedByUser {
+                                                    editedDescription = description
+                                                    isEditingDescription = true
+                                                }
+                                            }
+                                    }
                                 }
-                                .disabled(feedbackText.isEmpty)
-                                .opacity(feedbackText.isEmpty ? 0.6 : 1.0)
+                                .padding(.horizontal)
                             }
-                            .padding(.horizontal)
+                            
+                            // Feedback input for other users' projects
+                            if !isOwnedByUser {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    Text("Your Feedback")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    
+                                    TextField("Write your feedback...", text: $feedbackText, axis: .vertical)
+                                        .textFieldStyle(PlainTextFieldStyle())
+                                        .foregroundColor(.white)
+                                        .frame(minHeight: 60, alignment: .topLeading)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(12)
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(12)
+                                    
+                                    Button(action: submitFeedback) {
+                                        if isSubmittingFeedback {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle())
+                                        } else {
+                                            Text("Submit Feedback")
+                                                .font(.headline)
+                                                .foregroundColor(.white)
+                                                .frame(maxWidth: .infinity)
+                                                .padding()
+                                                .background(Color.black)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .stroke(Color.white, lineWidth: 1)
+                                                )
+                                                .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
+                                        }
+                                    }
+                                    .disabled(isSubmittingFeedback || feedbackText.isEmpty)
+                                    .opacity(feedbackText.isEmpty ? 0.6 : 1.0)
+                                }
+                                .padding(.horizontal)
+                            }
+                            
+                            // Reviews section for owned projects
+                            if isOwnedByUser {
+                                if isFeedbackLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle())
+                                        .padding()
                 } else {
-                            // Reviews
-                            ReviewsView(feedback: [])
+                                    ReviewsView(feedback: projectFeedback)
+                                }
+                            }
                         }
                     }
                     .padding(.vertical)
                     .padding(.bottom, 24)
                 }
-            } else if let error = error {
-                Text("Error: \(error.localizedDescription)")
-                    .foregroundColor(.red)
             }
         }
         .navigationBarHidden(true)
@@ -343,77 +362,60 @@ struct ProjectView: View {
         .onAppear {
             Task {
                 await loadProject()
+                await loadFeedback()
             }
         }
-        .sheet(isPresented: $showFeedbackSheet) {
-            NavigationStack {
-                VStack(spacing: 16) {
-                    Text("Submit Feedback")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                    
-                    TextField("Write your feedback...", text: $feedbackText, axis: .vertical)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .foregroundColor(.white)
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
-                    
-                    Button("Submit") {
-                        // TODO: Implement feedback submission
-                        showFeedbackSheet = false
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white)
-                }
-                .padding()
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Cancel") {
-                            showFeedbackSheet = false
-                        }
-                    }
-                }
-            }
+        .alert("Error Submitting Feedback", isPresented: $showFeedbackError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(feedbackError?.localizedDescription ?? "An unknown error occurred")
         }
+    }
+    
+    private func fetchAuthorName(userId: UUID) async throws -> String? {
+        let response = try await SupabaseManager.shared.client
+            .from("profiles")
+            .select("username")
+            .eq("id", value: userId)
+            .execute()
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        struct ProfileResponse: Codable {
+            let username: String
+        }
+        
+        if let profiles = try? decoder.decode([ProfileResponse].self, from: response.data),
+           let profile = profiles.first {
+            return profile.username
+        }
+        return nil
     }
     
     private func loadProject() async {
         do {
-            guard let project = try await ProjectService.shared.getProject(byId: projectId) else {
+            guard let loadedProject = try await ProjectService.shared.getProject(byId: projectId) else {
                 print("❌ [Project] Project not found with ID: \(projectId)")
                 return
             }
             
-            // Fetch username
-            let response = try await SupabaseManager.shared.client
-                .from("profiles")
-                .select("username")
-                .eq("id", value: project.userId)
-                .execute()
-            
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            
-            struct ProfileResponse: Codable {
-                let username: String
-            }
-            
-            if let profiles = try? decoder.decode([ProfileResponse].self, from: response.data),
-               let profile = profiles.first {
-                await MainActor.run {
-                    self.username = profile.username
-                }
-            }
+            // Get the project author's username
+            let authorName = try? await fetchAuthorName(userId: loadedProject.userId)
             
             await MainActor.run {
-                self.project = project
+                self.project = loadedProject
+                self.username = authorName ?? "User"
                 self.isLoading = false
+                // Check if the project is owned by the current user
+                if let currentUserId = AuthService.shared.currentUser?.id {
+                    self.isOwnedByUser = loadedProject.userId == currentUserId
+                }
             }
         } catch {
             print("❌ [Project] Error loading project: \(error)")
             await MainActor.run {
+                self.error = error
                 self.isLoading = false
             }
         }
@@ -421,11 +423,10 @@ struct ProjectView: View {
     
     private func updateProjectTitle() async {
         guard let project = project else { return }
+        
         do {
-            try await ProjectService.shared.updateProjectTitle(
-                id: project.id,
-                title: editedTitle
-            )
+            try await ProjectService.shared.updateProjectTitle(id: project.id, title: editedTitle)
+            
             await MainActor.run {
                 self.project = Project(
                     id: project.id,
@@ -447,11 +448,10 @@ struct ProjectView: View {
     
     private func updateProjectDescription() async {
         guard let project = project else { return }
+        
         do {
-            try await ProjectService.shared.updateProjectDescription(
-                id: project.id,
-                description: editedDescription
-            )
+            try await ProjectService.shared.updateProjectDescription(id: project.id, description: editedDescription)
+            
             await MainActor.run {
                 self.project = Project(
                     id: project.id,
@@ -468,6 +468,50 @@ struct ProjectView: View {
             }
         } catch {
             print("❌ [Project] Error updating description: \(error)")
+        }
+    }
+    
+    private func loadFeedback() async {
+        guard let projectUUID = UUID(uuidString: projectId) else { return }
+        
+        do {
+            let feedback = try await FeedbackService.shared.getFeedbackForProject(projectId: projectUUID)
+            await MainActor.run {
+                self.projectFeedback = feedback
+                self.isFeedbackLoading = false
+            }
+        } catch {
+            print("❌ [Project] Error loading feedback: \(error)")
+            await MainActor.run {
+                self.isFeedbackLoading = false
+            }
+        }
+    }
+    
+    private func submitFeedback() {
+        guard let projectUUID = UUID(uuidString: projectId) else { return }
+        isSubmittingFeedback = true
+        
+        Task {
+            do {
+                try await FeedbackService.shared.submitFeedback(
+                    projectId: projectUUID,
+                    comment: feedbackText
+                )
+                // Clear the form after successful submission
+                await MainActor.run {
+                    feedbackText = ""
+                    isSubmittingFeedback = false
+                }
+                // Reload feedback to show the new one
+                await loadFeedback()
+            } catch {
+                await MainActor.run {
+                    feedbackError = error
+                    showFeedbackError = true
+                    isSubmittingFeedback = false
+                }
+            }
         }
     }
 }

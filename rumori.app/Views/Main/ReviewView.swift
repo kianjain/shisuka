@@ -18,6 +18,7 @@ struct ReviewView: View {
     @State private var error: Error?
     @EnvironmentObject private var projectService: ProjectService
     @StateObject private var auth = AuthService.shared
+    @State private var isShowingProject = false
     
     var body: some View {
         NavigationStack {
@@ -136,16 +137,12 @@ struct ReviewView: View {
                                         if offset == .zero {
                                             // Navigate to project view
                                             let project = projects[currentIndex]
-                                            let projectView = ProjectView(projectId: project.id.uuidString, isReviewMode: true)
-                                            let hostingController = UIHostingController(rootView: 
-                                                VStack(spacing: 0) {
-                                                    
-                                                    projectView
-                                                }
-                                                .background(Color.black)
-                                            )
-                                            hostingController.modalPresentationStyle = .pageSheet
-                                            UIApplication.shared.windows.first?.rootViewController?.present(hostingController, animated: true)
+                                            isShowingProject = true
+                                        }
+                                    }
+                                    .sheet(isPresented: $isShowingProject) {
+                                        if currentIndex < projects.count {
+                                            ProjectView(projectId: projects[currentIndex].id.uuidString)
                                         }
                                     }
                                     .frame(maxWidth: .infinity)

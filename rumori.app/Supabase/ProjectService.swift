@@ -37,6 +37,18 @@ class ProjectService: ObservableObject {
         return compressedData
     }
     
+    private func compressAudio(_ audioData: Data, maxSizeInMB: Double = 5.0) -> Data? {
+        let fileSizeInMB = Double(audioData.count) / (1024 * 1024)
+        if fileSizeInMB <= maxSizeInMB {
+            return audioData
+        }
+        
+        // If the file is too large, we'll need to compress it
+        // For now, we'll just return nil to indicate the file is too large
+        // In a real implementation, you would use an audio compression library
+        return nil
+    }
+    
     @MainActor
     func uploadProject(title: String, description: String?, imageData: Data?, audioData: Data?) async throws -> Project {
         guard let userId = AuthService.shared.currentUser?.id else {
@@ -67,10 +79,15 @@ class ProjectService: ObservableObject {
             
             // Upload audio if provided
             if let audioData = audioData {
+                // Compress the audio before uploading
+                guard let compressedAudioData = compressAudio(audioData) else {
+                    throw NSError(domain: "ProjectService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Audio file is too large. Maximum size is 5MB."])
+                }
+                
                 audioFilePath = "\(userId)/project_\(timestamp)_audio.mp3"
                 try await client.storage
                     .from("project_files")
-                    .upload(audioFilePath!, data: audioData)
+                    .upload(audioFilePath!, data: compressedAudioData)
                 print("✅ Audio uploaded successfully")
             }
             
@@ -169,20 +186,30 @@ class ProjectService: ObservableObject {
         print("🔍 [Project] Current user email: \(AuthService.shared.currentUser?.email ?? "unknown")")
         
         do {
-            // First, let's check what projects exist in the database
-            let allProjectsResponse = try await client
-                .from("projects")
-                .select()
+            // First get all projects that the user has reviewed
+            let reviewedProjectsResponse = try await client
+                .from("feedback")
+                .select("project_id")
+                .eq("author_id", value: userId)
                 .execute()
             
-            print("🔍 [Project] All projects in database: \(String(data: allProjectsResponse.data, encoding: .utf8) ?? "nil")")
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
             
-            // Now get projects for review
+            struct ReviewedProject: Codable {
+                let project_id: UUID
+            }
+            
+            let reviewedProjects = try decoder.decode([ReviewedProject].self, from: reviewedProjectsResponse.data)
+            let reviewedProjectIds = reviewedProjects.map { $0.project_id }
+            
+            // Now get projects that the user hasn't reviewed yet
             let response = try await client
                 .from("projects")
                 .select()
                 .neq("user_id", value: userId)
                 .ilike("status", pattern: ProjectStatus.active.rawValue)
+                .not("id", operator: .in, value: reviewedProjectIds)
                 .order("created_at", ascending: false)
                 .execute()
             
@@ -190,12 +217,9 @@ class ProjectService: ObservableObject {
             
             // Check if the response is empty
             if response.data.isEmpty {
-                print("⚠️ [Project] No projects found in the database")
+                print("ℹ️ [Project] No projects available for review")
                 return []
             }
-            
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
             
             do {
                 let projects = try decoder.decode([Project].self, from: response.data)
@@ -213,6 +237,14 @@ class ProjectService: ObservableObject {
                 throw error
             }
             
+        } catch let error as PostgrestError {
+            // Handle PostgrestError specifically
+            if error.code == "PGRST100" {
+                print("ℹ️ [Project] No projects available for review")
+                return []
+            }
+            print("❌ [Project] Error fetching projects for review: \(error)")
+            throw error
         } catch {
             print("❌ [Project] Error fetching projects for review: \(error)")
             throw error

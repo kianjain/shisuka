@@ -138,14 +138,6 @@ struct ProjectPreview: Identifiable, Codable {
     let isOwnedByUser: Bool
     let lastStatusUpdate: Date?
     
-    var positiveRatings: Int {
-        feedback.filter { $0.rating > 0 }.count
-    }
-    
-    var negativeRatings: Int {
-        feedback.filter { $0.rating < 0 }.count
-    }
-    
     /// Returns true if the project can be transitioned to the given status
     func canTransition(to newStatus: ProjectStatus) -> Bool {
         // Only allow status changes for user-owned projects
@@ -174,6 +166,5 @@ struct Feedback: Identifiable, Codable {
     let id: UUID
     let author: String
     let comment: String
-    let rating: Int // 1 for like, -1 for dislike
     let date: Date
 } 
