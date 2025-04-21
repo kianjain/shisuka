@@ -302,6 +302,8 @@ struct MinimalisticCard: View {
             return "checkmark.circle.fill"
         case "person.2":
             return "person.2.fill"
+        case "nosign":
+            return "nosign"
         default:
             return "bell.fill"
         }
@@ -320,9 +322,12 @@ struct ReviewProjectCard: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .frame(width: 160, height: 200)
+                        .clipped()
                 } placeholder: {
                     Rectangle()
                         .fill(Color.gray.opacity(0.2))
+                        .frame(width: 160, height: 200)
                         .overlay(
                             Image(systemName: getFileTypeIcon(for: type))
                                 .font(.title2)
@@ -332,6 +337,7 @@ struct ReviewProjectCard: View {
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
+                    .frame(width: 160, height: 200)
                     .overlay(
                         Image(systemName: getFileTypeIcon(for: type))
                             .font(.title2)
@@ -345,6 +351,7 @@ struct ReviewProjectCard: View {
                 startPoint: .bottom,
                 endPoint: .center
             )
+            .frame(width: 160, height: 200)
             
             // Text Content
             VStack(alignment: .leading, spacing: 2) {
@@ -357,6 +364,7 @@ struct ReviewProjectCard: View {
                     .lineLimit(1)
             }
             .padding(12)
+            .frame(width: 160, height: 200, alignment: .bottomLeading)
         }
         .frame(width: 160, height: 200)
         .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -380,6 +388,18 @@ struct HomeView: View {
     @State private var showingSettings = false
     @Binding var selectedTab: Int
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var projectService: ProjectService
+    @StateObject private var auth = AuthService.shared
+    
+    // State for review projects
+    @State private var reviewProjects: [ProjectPreview] = []
+    @State private var isLoadingReviewProjects = true
+    @State private var reviewProjectsError: Error?
+    
+    // State for recent projects
+    @State private var recentProjects: [ProjectPreview] = []
+    @State private var isLoadingRecentProjects = true
+    @State private var recentProjectsError: Error?
     
     // Mock data
     private let newFeedbackCount = 12
@@ -459,14 +479,6 @@ struct HomeView: View {
         )
     ]
     
-    // Review projects data
-    private let reviewProjects = [
-        (title: "Summer Vibes", type: "Audio", imageUrl: URL(string: "https://example.com/summer-vibes.jpg")),
-        (title: "Street Life", type: "Images", imageUrl: URL(string: "https://example.com/street-life.jpg")),
-        (title: "Night Sounds", type: "Audio", imageUrl: URL(string: "https://example.com/night-sounds.jpg")),
-        (title: "Urban Series", type: "Images", imageUrl: URL(string: "https://example.com/urban-series.jpg"))
-    ]
-    
     private let featuredProjects = [
         ProjectPreview(
             id: UUID(),
@@ -521,7 +533,7 @@ struct HomeView: View {
                             FeedbackCountCard(count: newFeedbackCount)
                             
                             LibraryButton {
-                                // Handle library action
+                                selectedTab = 3 // Navigate to Library tab
                             }
                         }
                         .padding(.horizontal)
@@ -534,67 +546,145 @@ struct HomeView: View {
                                 .foregroundColor(.white)
                                 .padding(.horizontal)
                             
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(reviewProjects, id: \.title) { project in
-                                        NavigationLink(destination: ProjectView(projectId: project.title)) {
+                            if isLoadingReviewProjects {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 16) {
+                                        ForEach(0..<5) { _ in
                                             ReviewProjectCard(
-                                                title: project.title,
-                                                type: project.type,
-                                                imageUrl: project.imageUrl
+                                                title: "Loading...",
+                                                type: "Audio",
+                                                imageUrl: nil
                                             )
                                         }
                                     }
-                                    
-                                    // Review More Card
-                                    Button(action: {
-                                        selectedTab = 2
-                                    }) {
-                                        ZStack(alignment: .bottomLeading) {
-                                            // Background Image
-                                            Image("ReviewCardBackground")
-                                                .resizable()
-                                                .scaledToFill()
-                                                .frame(width: 160, height: 200)
-                                            
-                                            // Gradient Overlay
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [.black.opacity(0.7), .clear]),
-                                                startPoint: .bottom,
-                                                endPoint: .center
-                                            )
-                                            
-                                            // Text Content
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("REVIEW")
-                                                    .font(.system(size: 10, weight: .medium))
-                                                    .foregroundColor(.white.opacity(0.8))
-                                                Text("More Projects")
-                                                    .font(.system(size: 16, weight: .semibold))
-                                                    .foregroundColor(.white)
-                                                    .lineLimit(1)
-                                            }
-                                            .padding(12)
-                                        }
-                                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                                    }
+                                    .padding(.horizontal)
                                 }
-                                .padding(.horizontal)
+                            } else if let error = reviewProjectsError {
+                                VStack(spacing: 8) {
+                                    Text("Failed to load projects")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    Text(error.localizedDescription)
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                    Button("Try Again") {
+                                        loadReviewProjects()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(.white)
+                                }
+                                .padding()
+                            } else {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 16) {
+                                        ForEach(reviewProjects.prefix(5)) { project in
+                                            NavigationLink(destination: ProjectView(projectId: project.id.uuidString)) {
+                                                ReviewProjectCard(
+                                                    title: project.name,
+                                                    type: project.fileType,
+                                                    imageUrl: project.imageUrl
+                                                )
+                                            }
+                                        }
+                                        
+                                        // Review More Card
+                                        Button(action: {
+                                            selectedTab = 2 // Navigate to Review tab
+                                        }) {
+                                            ZStack(alignment: .bottomLeading) {
+                                                // Background Image
+                                                Image("Frame 615")
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 160, height: 200)
+                                                
+                                                // Gradient Overlay
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [.black.opacity(0.7), .clear]),
+                                                    startPoint: .bottom,
+                                                    endPoint: .center
+                                                )
+                                                
+                                                // Text Content
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text("REVIEW")
+                                                        .font(.system(size: 10, weight: .medium))
+                                                        .foregroundColor(.white.opacity(0.8))
+                                                    Text("More Projects")
+                                                        .font(.system(size: 16, weight: .semibold))
+                                                        .foregroundColor(.white)
+                                                        .lineLimit(1)
+                                                }
+                                                .padding(12)
+                                            }
+                                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
                             }
                         }
                         
                         // Minimalistic Cards Section
                         VStack(spacing: 12) {
-                            MinimalisticCard(
-                                title: "Recent Projects",
-                                icon: "clock.fill",
-                                items: recentProjectItems,
-                                color: .black,
-                                actionTitle: "View All Projects",
-                                action: {
-                                    selectedTab = 3 // Navigate to Library tab
-                                }
-                            )
+                            if isLoadingRecentProjects {
+                                MinimalisticCard(
+                                    title: "Recent Projects",
+                                    icon: "clock.fill",
+                                    items: [
+                                        MinimalisticCardItem(
+                                            name: "Loading...",
+                                            subtitle: "",
+                                            description: "Fetching your recent projects",
+                                            imageUrl: nil,
+                                            type: "doc"
+                                        )
+                                    ],
+                                    color: .black,
+                                    actionTitle: "View All Projects",
+                                    action: {
+                                        selectedTab = 3 // Navigate to Library tab
+                                    }
+                                )
+                            } else if recentProjects.isEmpty {
+                                MinimalisticCard(
+                                    title: "Recent Projects",
+                                    icon: "clock.fill",
+                                    items: [
+                                        MinimalisticCardItem(
+                                            name: "No Projects Yet",
+                                            subtitle: "",
+                                            description: "Upload your first project to get started",
+                                            imageUrl: nil,
+                                            type: "nosign"
+                                        )
+                                    ],
+                                    color: .black,
+                                    actionTitle: "Upload Project",
+                                    action: {
+                                        selectedTab = 1 // Navigate to Upload tab
+                                    }
+                                )
+                            } else {
+                                MinimalisticCard(
+                                    title: "Recent Projects",
+                                    icon: "clock.fill",
+                                    items: recentProjects.map { project in
+                                        MinimalisticCardItem(
+                                            name: project.name,
+                                            subtitle: project.uploadDate.formatted(date: .abbreviated, time: .omitted),
+                                            description: project.description,
+                                            imageUrl: project.imageUrl,
+                                            type: project.fileType
+                                        )
+                                    },
+                                    color: .black,
+                                    actionTitle: "View All Projects",
+                                    action: {
+                                        selectedTab = 3 // Navigate to Library tab
+                                    }
+                                )
+                            }
                             
                             MinimalisticCard(
                                 title: "Notifications",
@@ -668,6 +758,122 @@ struct HomeView: View {
                 SettingsView()
             }
         }
+        .onAppear {
+            loadReviewProjects()
+            loadRecentProjects()
+        }
+    }
+    
+    private func loadReviewProjects() {
+        isLoadingReviewProjects = true
+        reviewProjectsError = nil
+        
+        Task {
+            do {
+                let projects = try await projectService.getProjectsForReview()
+                var projectPreviews: [ProjectPreview] = []
+                
+                for project in projects {
+                    // Determine file type based on available paths
+                    let fileType = project.audioPath != nil ? "Audio" : "Images"
+                    
+                    // Fetch the author's profile
+                    let authorName = try? await fetchAuthorName(userId: project.userId)
+                    
+                    let preview = ProjectPreview(
+                        id: project.id,
+                        name: project.title,
+                        description: project.description ?? "",
+                        fileType: fileType,
+                        author: authorName ?? "User",
+                        imageUrl: project.imagePath.map { path in
+                            try? SupabaseManager.shared.client.storage
+                                .from("project_files")
+                                .getPublicURL(path: path)
+                        } ?? nil,
+                        uploadDate: project.createdAt,
+                        status: project.status,
+                        feedback: [],
+                        rumorsSpent: 0,
+                        likes: 0,
+                        isOwnedByUser: false,
+                        lastStatusUpdate: project.updatedAt
+                    )
+                    projectPreviews.append(preview)
+                }
+                
+                self.reviewProjects = projectPreviews
+                isLoadingReviewProjects = false
+            } catch {
+                self.reviewProjectsError = error
+                isLoadingReviewProjects = false
+            }
+        }
+    }
+    
+    private func loadRecentProjects() {
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+        
+        isLoadingRecentProjects = true
+        recentProjectsError = nil
+        
+        Task {
+            do {
+                let projects = try await projectService.getUserProjects(userId: userId)
+                var projectPreviews: [ProjectPreview] = []
+                
+                for project in projects {
+                    let preview = ProjectPreview(
+                        id: project.id,
+                        name: project.title,
+                        description: project.description ?? "",
+                        fileType: project.audioPath != nil ? "Audio" : "Images",
+                        author: "You",
+                        imageUrl: project.imagePath.map { path in
+                            try? SupabaseManager.shared.client.storage
+                                .from("project_files")
+                                .getPublicURL(path: path)
+                        } ?? nil,
+                        uploadDate: project.createdAt,
+                        status: project.status,
+                        feedback: [],
+                        rumorsSpent: 0,
+                        likes: 0,
+                        isOwnedByUser: true,
+                        lastStatusUpdate: project.updatedAt
+                    )
+                    projectPreviews.append(preview)
+                }
+                
+                // Sort by upload date, newest first
+                self.recentProjects = projectPreviews.sorted { $0.uploadDate > $1.uploadDate }
+                isLoadingRecentProjects = false
+            } catch {
+                self.recentProjectsError = error
+                isLoadingRecentProjects = false
+            }
+        }
+    }
+    
+    private func fetchAuthorName(userId: UUID) async throws -> String? {
+        let response = try await SupabaseManager.shared.client
+            .from("profiles")
+            .select("username")
+            .eq("id", value: userId)
+            .execute()
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        struct ProfileResponse: Codable {
+            let username: String
+        }
+        
+        if let profiles = try? decoder.decode([ProfileResponse].self, from: response.data),
+           let profile = profiles.first {
+            return profile.username
+        }
+        return nil
     }
 }
 

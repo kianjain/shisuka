@@ -217,15 +217,14 @@ class ProjectService: ObservableObject {
             }
             
             let reviewedProjects = try decoder.decode([ReviewedProject].self, from: reviewedProjectsResponse.data)
-            let reviewedProjectIds = reviewedProjects.map { $0.project_id }
+            let reviewedProjectIds = Set(reviewedProjects.map { $0.project_id })
             
-            // Now get projects that the user hasn't reviewed yet
+            // Get all active projects not owned by the user
             let response = try await client
                 .from("projects")
                 .select()
                 .neq("user_id", value: userId)
                 .ilike("status", pattern: ProjectStatus.active.rawValue)
-                .not("id", operator: .in, value: reviewedProjectIds)
                 .order("created_at", ascending: false)
                 .execute()
             
@@ -238,7 +237,11 @@ class ProjectService: ObservableObject {
             }
             
             do {
-                let projects = try decoder.decode([Project].self, from: response.data)
+                let allProjects = try decoder.decode([Project].self, from: response.data)
+                
+                // Filter out reviewed projects
+                let projects = allProjects.filter { !reviewedProjectIds.contains($0.id) }
+                
                 print("🔍 [Project] Found \(projects.count) projects for review")
                 
                 // Print details of each project found
@@ -389,6 +392,57 @@ class ProjectService: ObservableObject {
             throw NSError(domain: "ProjectService", code: response.status, userInfo: [
                 NSLocalizedDescriptionKey: "Failed to update project description"
             ])
+        }
+    }
+    
+    @MainActor
+    func getUserProjects(userId: UUID) async throws -> [Project] {
+        do {
+            let response = try await client
+                .from("projects")
+                .select()
+                .eq("user_id", value: userId)
+                .order("created_at", ascending: false)
+                .execute()
+            
+            print("🔍 [Project] Raw response data for user projects: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
+            // Check if the response is empty
+            if response.data.isEmpty {
+                print("ℹ️ [Project] No projects found for user")
+                return []
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            do {
+                let projects = try decoder.decode([Project].self, from: response.data)
+                print("🔍 [Project] Found \(projects.count) projects for user")
+                
+                // Print details of each project found
+                for project in projects {
+                    print("🔍 [Project] User project: \(project.title), status: \(project.status.rawValue)")
+                }
+                
+                return projects
+            } catch {
+                print("❌ [Project] Error decoding projects: \(error)")
+                print("❌ [Project] Raw data that failed to decode: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+                throw error
+            }
+            
+        } catch let error as PostgrestError {
+            // Handle PostgrestError specifically
+            if error.code == "PGRST100" {
+                print("ℹ️ [Project] No projects found for user")
+                return []
+            }
+            print("❌ [Project] Error fetching user projects: \(error)")
+            throw error
+        } catch {
+            print("❌ [Project] Error fetching user projects: \(error)")
+            throw error
         }
     }
 } 
