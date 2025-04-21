@@ -24,6 +24,18 @@ class ProjectService: ObservableObject {
             finalImage = renderer.image { context in
                 image.draw(in: CGRect(origin: .zero, size: newSize))
             }
+        } else {
+            // For project images, resize to max 1000px width while maintaining aspect ratio
+            let maxWidth: CGFloat = 1000
+            if image.size.width > maxWidth {
+                let scale = maxWidth / image.size.width
+                let newSize = CGSize(width: maxWidth, height: image.size.height * scale)
+                
+                let renderer = UIGraphicsImageRenderer(size: newSize)
+                finalImage = renderer.image { context in
+                    image.draw(in: CGRect(origin: .zero, size: newSize))
+                }
+            }
         }
         
         var compression: CGFloat = 0.8
@@ -32,6 +44,10 @@ class ProjectService: ObservableObject {
         while let data = compressedData, Double(data.count) > maxSizeInMB * 1024 * 1024 && compression > 0.1 {
             compression -= 0.1
             compressedData = finalImage.jpegData(compressionQuality: compression)
+        }
+        
+        if let finalData = compressedData {
+            print("✅ [Project] Image resized to \(Int(finalImage.size.width))x\(Int(finalImage.size.height)) and compressed to \(finalData.count) bytes")
         }
         
         return compressedData

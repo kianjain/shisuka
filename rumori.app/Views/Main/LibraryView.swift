@@ -310,6 +310,7 @@ struct LibraryView: View {
                     }
                     .padding(.vertical, 8.0)
                 }
+                .scrollIndicators(.hidden)
             }
             .navigationTitle("Library")
             .navigationBarTitleDisplayMode(.inline)

@@ -303,7 +303,21 @@ class AuthService: ObservableObject {
         let timestamp = Int(Date().timeIntervalSince1970)
         let filePath = "\(userId)/avatar_\(timestamp).jpg"
         
-        // Upload the image
+        // Delete old avatar if it exists
+        if let oldAvatarUrl = currentProfile?.avatarUrl,
+           let oldPath = oldAvatarUrl.components(separatedBy: "/").last {
+            do {
+                try await client.storage
+                    .from("avatars")
+                    .remove(paths: ["\(userId)/\(oldPath)"])
+                print("✅ [Profile] Successfully deleted old avatar")
+            } catch {
+                print("⚠️ [Profile] Could not delete old avatar: \(error)")
+                // Continue with upload even if deletion fails
+            }
+        }
+        
+        // Upload the new image
         let _ = try await client.storage
             .from("avatars")
             .upload(filePath, data: compressedData)
@@ -325,9 +339,9 @@ class AuthService: ObservableObject {
             return data
         }
         
-        // Resize image to max 1024x1024 while maintaining aspect ratio
-        let maxSize: CGFloat = 1024
-        let scale = min(maxSize / image.size.width, maxSize / image.size.height)
+        // Resize image to 200x200 while maintaining aspect ratio
+        let targetSize = CGSize(width: 200, height: 200)
+        let scale = min(targetSize.width / image.size.width, targetSize.height / image.size.height)
         let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
         
         UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
@@ -336,11 +350,12 @@ class AuthService: ObservableObject {
         UIGraphicsEndImageContext()
         
         guard let resizedImage = resizedImage,
-              let compressedData = resizedImage.jpegData(compressionQuality: 0.7) else {
+              let compressedData = resizedImage.jpegData(compressionQuality: 0.5) else {
             print("❌ [Profile] Failed to compress image")
             return data
         }
         
+        print("✅ [Profile] Image resized to \(Int(newSize.width))x\(Int(newSize.height)) and compressed to \(compressedData.count) bytes")
         return compressedData
     }
     
