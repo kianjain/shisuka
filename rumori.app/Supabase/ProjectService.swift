@@ -100,7 +100,7 @@ class ProjectService: ObservableObject {
                     throw NSError(domain: "ProjectService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Audio file is too large. Maximum size is 5MB."])
                 }
                 
-                audioFilePath = "\(userId)/project_\(timestamp)_audio.mp3"
+                audioFilePath = "\(userId)/project_\(timestamp)_audio.m4a"
                 try await client.storage
                     .from("project_files")
                     .upload(audioFilePath!, data: compressedAudioData)

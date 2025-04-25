@@ -170,6 +170,7 @@ struct LibraryButton: View {
 }
 
 struct MinimalisticCardItem {
+    let id: String
     let name: String
     let subtitle: String
     let description: String
@@ -200,8 +201,8 @@ struct MinimalisticCard: View {
             
             // Items
             VStack(spacing: 12) {
-                ForEach(items, id: \.name) { item in
-                    NavigationLink(destination: ProjectView(projectId: item.name)) {
+                ForEach(items, id: \.id) { item in
+                    NavigationLink(destination: ProjectView(projectId: item.id)) {
                         HStack(spacing: 12) {
                             // Image or Icon
                             if let imageUrl = item.imageUrl {
@@ -407,6 +408,7 @@ struct HomeView: View {
     // Favorites data
     private let favoriteItems = [
         MinimalisticCardItem(
+            id: "Summer Beat",
             name: "Summer Beat",
             subtitle: "🎵",
             description: "A fresh electronic track with tropical vibes",
@@ -414,6 +416,7 @@ struct HomeView: View {
             type: "Audio"
         ),
         MinimalisticCardItem(
+            id: "Portrait Series",
             name: "Portrait Series",
             subtitle: "📸",
             description: "A collection of street photography shots",
@@ -421,6 +424,7 @@ struct HomeView: View {
             type: "Images"
         ),
         MinimalisticCardItem(
+            id: "Urban Soundscape",
             name: "Urban Soundscape",
             subtitle: "🎧",
             description: "Field recordings from city streets",
@@ -432,6 +436,7 @@ struct HomeView: View {
     // Notifications data
     private let notificationItems = [
         MinimalisticCardItem(
+            id: "New Feedback",
             name: "New Feedback",
             subtitle: "2h ago",
             description: "John commented on 'Summer Beat'",
@@ -439,6 +444,7 @@ struct HomeView: View {
             type: "comment"
         ),
         MinimalisticCardItem(
+            id: "Project Completed",
             name: "Project Completed",
             subtitle: "1d ago",
             description: "Portrait Series is now live",
@@ -446,6 +452,7 @@ struct HomeView: View {
             type: "checkmark.circle"
         ),
         MinimalisticCardItem(
+            id: "New Followers",
             name: "New Followers",
             subtitle: "2d ago",
             description: "You gained 3 new followers",
@@ -457,6 +464,7 @@ struct HomeView: View {
     // Recent Projects data
     private let recentProjectItems = [
         MinimalisticCardItem(
+            id: "Urban Soundscape",
             name: "Urban Soundscape",
             subtitle: "2 days ago",
             description: "A collection of field recordings capturing the unique sounds of city life, from bustling streets to quiet alleyways.",
@@ -464,6 +472,7 @@ struct HomeView: View {
             type: "Audio"
         ),
         MinimalisticCardItem(
+            id: "Portrait Series",
             name: "Portrait Series",
             subtitle: "5 days ago",
             description: "A series of street portraits exploring human emotions and connections in urban environments.",
@@ -471,6 +480,7 @@ struct HomeView: View {
             type: "Images"
         ),
         MinimalisticCardItem(
+            id: "Summer Beat",
             name: "Summer Beat",
             subtitle: "1 week ago",
             description: "An upbeat electronic track blending tropical elements with modern production techniques.",
@@ -633,6 +643,7 @@ struct HomeView: View {
                                     icon: "clock.fill",
                                     items: [
                                         MinimalisticCardItem(
+                                            id: "Loading...",
                                             name: "Loading...",
                                             subtitle: "",
                                             description: "Fetching your recent projects",
@@ -652,6 +663,7 @@ struct HomeView: View {
                                     icon: "clock.fill",
                                     items: [
                                         MinimalisticCardItem(
+                                            id: "No Projects Yet",
                                             name: "No Projects Yet",
                                             subtitle: "",
                                             description: "Upload your first project to get started",
@@ -671,6 +683,7 @@ struct HomeView: View {
                                     icon: "clock.fill",
                                     items: recentProjects.map { project in
                                         MinimalisticCardItem(
+                                            id: project.id.uuidString,
                                             name: project.name,
                                             subtitle: project.uploadDate.formatted(date: .abbreviated, time: .omitted),
                                             description: project.description,

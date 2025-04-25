@@ -153,8 +153,10 @@ struct FilePreviewView: View {
             
             if let audioURL = audioURL {
                 Text("Selected: \(audioURL.lastPathComponent)")
-                    .foregroundColor(.white)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.7))
                     .padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             
             if selectedUploadType == .audio && imageData == nil {
@@ -192,7 +194,9 @@ struct FileSelectionView: View {
     @Binding var projectDescription: String
     @Binding var isUploading: Bool
     @Binding var showError: Bool
-    @Binding var errorMessage: String
+    @Binding var errorMessage: String?
+    @Binding var showingAudioCropper: Bool
+    @Binding var selectedAudioURL: URL?
     let viewModel: UploadViewModel
     
     var body: some View {
@@ -232,7 +236,8 @@ struct FileSelectionView: View {
                     projectDescription = ""
                     isUploading = false
                     showError = false
-                    errorMessage = ""
+                    errorMessage = nil
+                    selectedAudioURL = nil
                 }
                 .padding(.top, 8)
             }
@@ -318,7 +323,12 @@ struct UploadContentView: View {
     @Binding var projectDescription: String
     @Binding var isUploading: Bool
     @Binding var showError: Bool
-    @Binding var errorMessage: String
+    @Binding var errorMessage: String?
+    @Binding var showingAudioCropper: Bool
+    @Binding var selectedAudioURL: URL?
+    @Binding var showingProfile: Bool
+    @Binding var showingSettings: Bool
+    @Binding var showingNotifications: Bool
     let viewModel: UploadViewModel
     let uploadAction: () -> Void
     
@@ -331,7 +341,7 @@ struct UploadContentView: View {
             if showSuccess {
                 SuccessView(selectedTab: $selectedTab, showSuccess: $showSuccess)
                     .transition(.opacity)
-                    .navigationBarHidden(true) // Hide navigation bar during success screen
+                    .navigationBarHidden(true)
             } else {
                 ScrollView {
                     VStack(spacing: 24) {
@@ -346,7 +356,12 @@ struct UploadContentView: View {
                             projectDescription: $projectDescription,
                             isUploading: $isUploading,
                             showError: $showError,
-                            errorMessage: $errorMessage,
+                            errorMessage: Binding(
+                                get: { errorMessage ?? "" },
+                                set: { errorMessage = $0 }
+                            ),
+                            showingAudioCropper: $showingAudioCropper,
+                            selectedAudioURL: $selectedAudioURL,
                             viewModel: viewModel
                         )
                         
@@ -366,8 +381,35 @@ struct UploadContentView: View {
                 .scrollIndicators(.hidden)
             }
         }
+        .navigationTitle("Upload")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                ProfileButton(size: 32) {
+                    showingProfile = true
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 16) {
+                    Button(action: {
+                        showingSettings = true
+                    }) {
+                        Image(systemName: "gear")
+                            .foregroundColor(.white)
+                    }
+                    
+                    Button(action: {
+                        showingNotifications = true
+                    }) {
+                        Image(systemName: "bell.badge.fill")
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+        }
         .onChange(of: selectedTab) { oldValue, newValue in
-            if newValue == 3 { // If switching to Library tab
+            if newValue == 3 {
                 showSuccess = false
             }
         }
@@ -378,13 +420,9 @@ struct UploadView: View {
     @StateObject private var viewModel = UploadViewModel()
     @State private var selectedImage: PhotosPickerItem?
     @State private var selectedAudio: URL?
-    @State private var imageData: Data?
-    @State private var audioData: Data?
     @State private var projectName = ""
     @State private var projectDescription = ""
     @State private var isUploading = false
-    @State private var showError = false
-    @State private var errorMessage = ""
     @State private var selectedUploadType: UploadType?
     @State private var showingProfile = false
     @State private var showingSettings = false
@@ -393,7 +431,6 @@ struct UploadView: View {
     @State private var showSuccess = false
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: Int = 4
-    @State private var showFilePicker = false
     
     var body: some View {
         NavigationStack {
@@ -403,79 +440,69 @@ struct UploadView: View {
                 selectedUploadType: $selectedUploadType,
                 showingImagePicker: $showingImagePicker,
                 selectedImage: $selectedImage,
-                imageData: $imageData,
+                imageData: $viewModel.imageData,
                 selectedAudio: $selectedAudio,
-                audioData: $audioData,
+                audioData: $viewModel.audioData,
                 projectName: $projectName,
                 projectDescription: $projectDescription,
                 isUploading: $isUploading,
-                showError: $showError,
-                errorMessage: $errorMessage,
+                showError: $viewModel.showError,
+                errorMessage: $viewModel.errorMessage,
+                showingAudioCropper: $viewModel.showingAudioCropper,
+                selectedAudioURL: $viewModel.selectedAudioURL,
+                showingProfile: $showingProfile,
+                showingSettings: $showingSettings,
+                showingNotifications: $showingNotifications,
                 viewModel: viewModel,
                 uploadAction: uploadProject
             )
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Upload")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                }
-                
-                ToolbarItem(placement: .navigationBarLeading) {
-                    ProfileButton(size: 32) {
-                        showingProfile = true
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button(action: {
-                            showingSettings = true
-                        }) {
-                            Image(systemName: "gear")
-                                .foregroundColor(.white)
-                        }
-                        
-                        Button(action: {
-                            showingNotifications = true
-                        }) {
-                            Image(systemName: "bell.badge.fill")
-                                .foregroundColor(.white)
-                        }
-                    }
-                }
+        }
+        .photosPicker(isPresented: $showingImagePicker, selection: $selectedImage, matching: .images)
+        .onChange(of: selectedImage) { oldValue, newValue in
+            Task {
+                await viewModel.loadImageData(from: newValue)
             }
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-            .sheet(isPresented: $showingProfile) {
+        }
+        .onChange(of: viewModel.croppedAudioURL) { oldValue, newValue in
+            if let url = newValue {
+                selectedAudio = url
+            }
+        }
+        .sheet(isPresented: $viewModel.showingAudioCropper) {
+            if let audioURL = viewModel.selectedAudioURL {
+                NavigationStack {
+                    ZStack {
+                        Color.black.ignoresSafeArea()
+                        VStack {
+                            AudioCropperView(audioURL: audioURL, viewModel: viewModel)
+                        }
+                        .navigationTitle("Crop Audio")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    viewModel.showingAudioCropper = false
+                                }
+                            }
+                        }
+                    }
+                }
+                .presentationDetents([.large])
+            }
+        }
+        .sheet(isPresented: $showingProfile) {
+            NavigationStack {
                 ProfileView()
             }
-            .sheet(isPresented: $showingSettings) {
+        }
+        .sheet(isPresented: $showingSettings) {
+            NavigationStack {
                 SettingsView()
             }
-            .sheet(isPresented: $showingNotifications) {
+        }
+        .sheet(isPresented: $showingNotifications) {
+            NavigationStack {
                 ActivityView()
-            }
-            .photosPicker(isPresented: $showingImagePicker, selection: $selectedImage, matching: .images)
-            .onChange(of: selectedImage) { oldValue, newValue in
-                Task {
-                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                        self.imageData = data
-                    } else {
-                        self.imageData = nil
-                    }
-                }
-            }
-            .onChange(of: viewModel.selectedAudioURL) { oldValue, newValue in
-                if let url = newValue {
-                    selectedAudio = url
-                    do {
-                        audioData = try Data(contentsOf: url)
-                    } catch {
-                        showError = true
-                        errorMessage = "Failed to load audio file: \(error.localizedDescription)"
-                    }
-                }
             }
         }
     }
@@ -489,8 +516,8 @@ struct UploadView: View {
                 _ = try await ProjectService.shared.uploadProject(
                     title: projectName,
                     description: projectDescription.isEmpty ? nil : projectDescription,
-                    imageData: imageData,
-                    audioData: audioData
+                    imageData: viewModel.imageData,
+                    audioData: viewModel.audioData
                 )
                 
                 await MainActor.run {
@@ -498,16 +525,17 @@ struct UploadView: View {
                     // Reset form
                     projectName = ""
                     projectDescription = ""
-                    imageData = nil
-                    audioData = nil
+                    viewModel.imageData = nil
+                    viewModel.audioData = nil
                     selectedImage = nil
                     selectedAudio = nil
                     selectedUploadType = nil
+                    viewModel.selectedAudioURL = nil
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showError = true
+                    viewModel.errorMessage = error.localizedDescription
+                    viewModel.showError = true
                 }
             }
             
@@ -520,9 +548,61 @@ struct UploadView: View {
 
 class UploadViewModel: NSObject, ObservableObject, UIDocumentPickerDelegate {
     @Published var selectedAudioURL: URL?
+    @Published var croppedAudioURL: URL?
+    @Published var audioData: Data?
+    @Published var errorMessage: String?
+    @Published var showError: Bool = false
+    @Published var imageData: Data?
+    @Published var showingAudioCropper: Bool = false
     
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        guard let url = urls.first else { return }
+        print("📁 Document picker selected files: \(urls)")
+        guard let url = urls.first else { 
+            print("❌ No URL selected")
+            return 
+        }
+        print("✅ Selected audio URL: \(url)")
+        print("📱 Current selectedAudioURL state: \(String(describing: selectedAudioURL))")
         selectedAudioURL = url
+        print("📱 New selectedAudioURL state: \(String(describing: selectedAudioURL))")
+        showingAudioCropper = true
+    }
+    
+    func handleCroppedAudio(_ url: URL) {
+        print("✂️ Cropped audio URL received: \(url)")
+        print("📱 Current croppedAudioURL state: \(String(describing: croppedAudioURL))")
+        croppedAudioURL = url
+        print("📱 New croppedAudioURL state: \(String(describing: croppedAudioURL))")
+        loadAudioData(from: url)
+    }
+    
+    func loadImageData(from item: PhotosPickerItem?) async {
+        guard let item = item else { return }
+        do {
+            let data = try await item.loadTransferable(type: Data.self)
+            await MainActor.run {
+                imageData = data
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to load image: \(error.localizedDescription)"
+                showError = true
+            }
+        }
+    }
+    
+    private func loadAudioData(from url: URL) {
+        Task { @MainActor in
+            do {
+                print("📦 Loading audio data from URL")
+                let data = try Data(contentsOf: url)
+                audioData = data
+                print("✅ Successfully loaded audio data")
+            } catch {
+                print("❌ Failed to load audio data: \(error)")
+                errorMessage = "Failed to load audio file: \(error.localizedDescription)"
+                showError = true
+            }
+        }
     }
 } 

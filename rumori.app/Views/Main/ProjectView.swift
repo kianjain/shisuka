@@ -258,13 +258,19 @@ struct ProjectView: View {
                             // Audio Player
                             if let audioPath = project.audioPath,
                                let audioURL = try? storage.getPublicURL(path: audioPath) {
-                                AudioPlayerView(audioURL: audioURL)
-                                    .padding(.horizontal)
+                                // Get the original filename without extension
+                                let originalName = (audioPath as NSString).deletingPathExtension
+                                // Create the final path with .m4a extension
+                                let finalAudioPath = "\(originalName).m4a"
+                                if let finalAudioURL = try? storage.getPublicURL(path: finalAudioPath) {
+                                    AudioPlayerView(audioURL: finalAudioURL)
+                                        .padding(.horizontal)
+                                }
                             }
                             
                             // Description
                             if let description = project.description, !description.isEmpty {
-                                VStack(alignment: .leading, spacing: 16) {
+                                VStack(alignment: .leading, spacing: 8) {
                                     Text("Description")
                                         .font(.headline)
                                         .foregroundColor(.white)
@@ -300,7 +306,7 @@ struct ProjectView: View {
                             
                             // Feedback input for other users' projects
                             if !isOwnedByUser {
-                                VStack(alignment: .leading, spacing: 16) {
+                                VStack(alignment: .leading, spacing: 8) {
                                     Text("Your Feedback")
                                         .font(.headline)
                                         .foregroundColor(.white)
@@ -314,6 +320,9 @@ struct ProjectView: View {
                                         .padding(12)
                                         .background(Color(.systemGray6))
                                         .cornerRadius(12)
+                                    
+                                    Spacer()
+                                        .frame(height: 16)
                                     
                                     Button(action: submitFeedback) {
                                         if isSubmittingFeedback {
@@ -346,8 +355,46 @@ struct ProjectView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle())
                                         .padding()
-                } else {
-                                    ReviewsView(feedback: projectFeedback)
+                                } else {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Reviews")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        if projectFeedback.isEmpty {
+                                            Text("No reviews yet")
+                                                .font(.subheadline)
+                                                .foregroundColor(.gray)
+                                                .frame(maxWidth: .infinity, alignment: .center)
+                                                .padding()
+                                        } else {
+                                            ForEach(projectFeedback) { review in
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    HStack {
+                                                        Text(review.author.username)
+                                                            .font(.subheadline)
+                                                            .bold()
+                                                            .foregroundColor(.white)
+                                                        
+                                                        Spacer()
+                                                        
+                                                        Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
+                                                            .font(.caption)
+                                                            .foregroundColor(.gray)
+                                                    }
+                                                    
+                                                    Text(review.comment)
+                                                        .font(.body)
+                                                        .foregroundColor(.gray)
+                                                }
+                                                .padding()
+                                                .background(Color(.systemGray6))
+                                                .cornerRadius(12)
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal)
                                 }
                             }
                         }
