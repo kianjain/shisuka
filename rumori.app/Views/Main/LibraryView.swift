@@ -92,11 +92,7 @@ struct ProjectCard: View {
                     
                     // Stats
                     HStack(spacing: 12) {
-                        Label("\(project.feedback.count)", systemImage: "bubble.left.fill")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        
-                        Label("\(project.likes)", systemImage: "star.fill")
+                        Label("\(project.feedback.count) reviews", systemImage: "bubble.left.fill")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -396,9 +392,12 @@ struct LibraryView: View {
         Task {
             do {
                 let projects = try await ProjectService.shared.getProjects()
-                self.projects = projects.map { project in
+                var newProjects: [ProjectPreview] = []
+                
+                for project in projects {
                     print("🔍 [Library] Project: \(project.title)")
                     print("🔍 [Library] Image path: \(String(describing: project.imagePath))")
+                    
                     let imageUrl = {
                         let storage = SupabaseManager.shared.client.storage.from("project_files")
                         if let imagePath = project.imagePath {
@@ -408,9 +407,12 @@ struct LibraryView: View {
                         }
                         return nil
                     }()
-                    print("🔍 [Library] Final image URL: \(String(describing: imageUrl))")
                     
-                    return ProjectPreview(
+                    // Get feedback count using FeedbackService
+                    let feedback = try await FeedbackService.shared.getFeedbackForProject(projectId: project.id)
+                    print("🔍 [Library] Feedback count for project \(project.id): \(feedback.count)")
+                    
+                    let projectPreview = ProjectPreview(
                         id: project.id,
                         name: project.title,
                         description: project.description ?? "",
@@ -419,13 +421,17 @@ struct LibraryView: View {
                         imageUrl: imageUrl,
                         uploadDate: project.createdAt,
                         status: project.status,
-                        feedback: [],
+                        feedback: Array(repeating: Feedback(id: UUID(), author: "User", comment: "", date: Date()), count: feedback.count),
                         rumorsSpent: 0,
                         likes: 0,
                         isOwnedByUser: true,
                         lastStatusUpdate: project.updatedAt
                     )
+                    
+                    newProjects.append(projectPreview)
                 }
+                
+                self.projects = newProjects
                 isLoading = false
             } catch {
                 self.error = error
@@ -448,5 +454,16 @@ struct LibraryView: View {
 
 #Preview {
     LibraryView()
+}
+
+extension Array {
+    func asyncMap<T>(_ transform: (Element) async throws -> T) async rethrows -> [T] {
+        var results: [T] = []
+        for element in self {
+            let result = try await transform(element)
+            results.append(result)
+        }
+        return results
+    }
 } 
 
