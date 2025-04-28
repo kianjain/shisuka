@@ -164,7 +164,7 @@ struct FilePreviewView: View {
                     HStack {
                         Image(systemName: "photo")
                             .font(.title2)
-                        Text("Add Cover Image (Optional)")
+                        Text("Add Cover Image")
                             .lineLimit(1)
                         Spacer()
                     }
@@ -302,10 +302,10 @@ struct UploadFormView: View {
             .padding(.top, 8)
             .disabled(projectName.isEmpty || isUploading || 
                     (selectedUploadType == .photo && imageData == nil) ||
-                    (selectedUploadType == .audio && audioData == nil))
+                    (selectedUploadType == .audio && (audioData == nil || imageData == nil)))
             .opacity(projectName.isEmpty || isUploading || 
                     (selectedUploadType == .photo && imageData == nil) ||
-                    (selectedUploadType == .audio && audioData == nil) ? 0.6 : 1.0)
+                    (selectedUploadType == .audio && (audioData == nil || imageData == nil)) ? 0.6 : 1.0)
         }
     }
 }
@@ -376,7 +376,8 @@ struct UploadContentView: View {
                         )
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 16)
+                    .padding(.vertical)
+                    .padding(.bottom, 24)
                 }
                 .scrollIndicators(.hidden)
             }
@@ -384,6 +385,12 @@ struct UploadContentView: View {
         .navigationTitle("Upload")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Upload")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
             ToolbarItem(placement: .navigationBarLeading) {
                 ProfileButton(size: 32) {
                     showingProfile = true
@@ -408,6 +415,7 @@ struct UploadContentView: View {
                 }
             }
         }
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .onChange(of: selectedTab) { oldValue, newValue in
             if newValue == 3 {
                 showSuccess = false
@@ -478,13 +486,6 @@ struct UploadView: View {
                         }
                         .navigationTitle("Crop Audio")
                         .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Done") {
-                                    viewModel.showingAudioCropper = false
-                                }
-                            }
-                        }
                     }
                 }
                 .presentationDetents([.large])

@@ -311,6 +311,9 @@ struct LibraryView: View {
                     .padding(.vertical, 8.0)
                 }
                 .scrollIndicators(.hidden)
+                .refreshable {
+                    await loadProjects()
+                }
             }
             .navigationTitle("Library")
             .navigationBarTitleDisplayMode(.inline)

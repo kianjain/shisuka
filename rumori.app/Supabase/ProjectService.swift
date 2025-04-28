@@ -323,6 +323,13 @@ class ProjectService: ObservableObject {
                     .remove(paths: [audioPath])
             }
             
+            // Delete all feedback for this project
+            _ = try await client
+                .from("feedback")
+                .delete()
+                .eq("project_id", value: projectId)
+                .execute()
+            
             // Delete the project record
             _ = try await client
                 .from("projects")
@@ -331,7 +338,7 @@ class ProjectService: ObservableObject {
                 .eq("user_id", value: userId)
                 .execute()
             
-            print("✅ Project deleted successfully")
+            print("✅ Project and its feedback deleted successfully")
         } catch {
             print("❌ [Project] Error deleting project: \(error)")
             throw error

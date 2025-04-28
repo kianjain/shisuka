@@ -40,7 +40,7 @@ class FeedbackService {
         // First, get all feedback for the project
         let feedbackResponse = try await supabase
             .from("feedback")
-            .select("id, project_id, author_id, comment, created_at")
+            .select("id, project_id, author_id, comment, created_at, seen_at")
             .eq("project_id", value: projectId)
             .order("created_at", ascending: false)
             .execute()
@@ -74,6 +74,7 @@ class FeedbackService {
                     authorId: item.authorId,
                     comment: item.comment,
                     createdAt: item.createdAt,
+                    seenAt: item.seenAt,
                     author: FeedbackResponse.Profile(username: profile.username)
                 )
                 
@@ -87,6 +88,7 @@ class FeedbackService {
                     authorId: item.authorId,
                     comment: item.comment,
                     createdAt: item.createdAt,
+                    seenAt: item.seenAt,
                     author: FeedbackResponse.Profile(username: "User")
                 )
                 responses.append(response)
@@ -103,6 +105,7 @@ class FeedbackService {
         let authorId: UUID
         let comment: String
         let createdAt: Date
+        let seenAt: String?
         
         enum CodingKeys: String, CodingKey {
             case id
@@ -110,6 +113,7 @@ class FeedbackService {
             case authorId = "author_id"
             case comment
             case createdAt = "created_at"
+            case seenAt = "seen_at"
         }
     }
     
@@ -146,6 +150,59 @@ class FeedbackService {
         print("✅ [Feedback] Found username: \(username)")
         return username
     }
+    
+    func markFeedbackAsSeen(feedbackId: UUID) async throws {
+        try await supabase
+            .from("feedback")
+            .update(["seen_at": Date().ISO8601Format()])
+            .eq("id", value: feedbackId.uuidString)
+            .execute()
+    }
+    
+    func getUnreadFeedbackCount() async throws -> Int {
+        guard let userId = AuthService.shared.currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+        
+        print("🔍 [Feedback] Fetching unread feedback count for user: \(userId)")
+        
+        // First get all projects owned by the user
+        let projectsResponse = try await supabase
+            .from("projects")
+            .select("id")
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+            
+        let decoder = JSONDecoder()
+        struct ProjectId: Codable {
+            let id: UUID
+        }
+        
+        let projects = try decoder.decode([ProjectId].self, from: projectsResponse.data)
+        print("✅ [Feedback] Found \(projects.count) projects owned by user")
+        
+        // If no projects, return 0
+        if projects.isEmpty {
+            return 0
+        }
+        
+        // Get count of unread feedback for all projects
+        let feedbackResponse = try await supabase
+            .from("feedback")
+            .select("id")
+            .in("project_id", value: projects.map { $0.id.uuidString })
+            .is("seen_at", value: nil)
+            .execute()
+            
+        struct FeedbackId: Codable {
+            let id: UUID
+        }
+        
+        let unreadFeedback = try decoder.decode([FeedbackId].self, from: feedbackResponse.data)
+        print("✅ [Feedback] Found \(unreadFeedback.count) unread feedback items")
+        
+        return unreadFeedback.count
+    }
 }
 
 // Response type that includes the author's username
@@ -155,6 +212,7 @@ struct FeedbackResponse: Codable, Identifiable {
     let authorId: UUID
     let comment: String
     let createdAt: Date
+    let seenAt: String?
     let author: Profile
     
     struct Profile: Codable {
@@ -167,6 +225,7 @@ struct FeedbackResponse: Codable, Identifiable {
         case authorId = "author_id"
         case comment
         case createdAt = "created_at"
+        case seenAt = "seen_at"
         case author
     }
 }

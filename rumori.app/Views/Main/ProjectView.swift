@@ -1,5 +1,7 @@
 import SwiftUI
 import AVFoundation
+import PhotosUI
+import Supabase
 
 // MARK: - Project Image View
 private struct ProjectImageView: View {
@@ -180,6 +182,7 @@ private struct FeedbackInputView: View {
 
 // MARK: - Main Project View
 struct ProjectView: View {
+    @Environment(\.dismiss) private var dismiss
     let projectId: String
     
     @State private var project: Project?
@@ -203,6 +206,27 @@ struct ProjectView: View {
     @State private var editedDescription: String = ""
     @FocusState private var isTitleFocused: Bool
     @FocusState private var isDescriptionFocused: Bool
+    
+    // Success state
+    @State private var showFeedbackSuccess = false
+    
+    // New states
+    @State private var showingProfile = false
+    @State private var showingSettings = false
+    @State private var showingNotifications = false
+    @State private var showingDeleteAlert = false
+    @State private var projectToDelete: Project?
+    @State private var isEditing = false
+    @State private var showingImagePicker = false
+    @State private var selectedImage: PhotosPickerItem?
+    @State private var imageData: Data?
+    @State private var isUploadingImage = false
+    @State private var imageError: Error?
+    @State private var showImageError = false
+    @State private var isDeleting = false
+    @State private var isShowingProject = false
+    @State private var isShowingLibrary = false
+    @State private var selectedTab: Int = 0
     
     init(projectId: String) {
         self.projectId = projectId
@@ -228,9 +252,33 @@ struct ProjectView: View {
                     Text(error.localizedDescription)
                         .foregroundColor(.gray)
                 }
+            } else if showFeedbackSuccess {
+                VStack(spacing: 20) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.white)
+                    
+                    Text("Feedback Submitted!")
+                        .font(.title3)
+                        .bold()
+                        .foregroundColor(.white)
+                    
+                    Text("Thank you for your feedback!")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    showFeedbackSuccess = false
+                    dismiss()
+                }
             } else {
-        ScrollView {
-            VStack(spacing: 24) {
+                ScrollView {
+                    VStack(spacing: 24) {
                         if let project = project {
                             // Cover image
                             let storage = SupabaseManager.shared.client.storage.from("project_files")
@@ -307,10 +355,18 @@ struct ProjectView: View {
                             // Feedback input for other users' projects
                             if !isOwnedByUser {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("Your Feedback")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    HStack {
+                                        Text("Your Feedback")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                        
+                                        Spacer()
+                                        
+                                        Text("\(feedbackText.count)/100")
+                                            .font(.caption)
+                                            .foregroundColor(feedbackText.count >= 100 ? .white : .gray)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                     
                                     TextField("Write your feedback...", text: $feedbackText, axis: .vertical)
                                         .textFieldStyle(PlainTextFieldStyle())
@@ -326,8 +382,12 @@ struct ProjectView: View {
                                     
                                     Button(action: submitFeedback) {
                                         if isSubmittingFeedback {
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle())
+                                            HStack {
+                                                Spacer()
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle())
+                                                Spacer()
+                                            }
                                         } else {
                                             Text("Submit Feedback")
                                                 .font(.headline)
@@ -343,10 +403,41 @@ struct ProjectView: View {
                                                 .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
                                         }
                                     }
-                                    .disabled(isSubmittingFeedback || feedbackText.isEmpty)
-                                    .opacity(feedbackText.isEmpty ? 0.6 : 1.0)
+                                    .disabled(isSubmittingFeedback || feedbackText.count < 100)
+                                    .opacity(feedbackText.count < 100 ? 0.6 : 1.0)
                                 }
                                 .padding(.horizontal)
+                                .overlay {
+                                    if showFeedbackSuccess {
+                                        Color.black
+                                            .ignoresSafeArea()
+                                            .overlay {
+                                                VStack(spacing: 20) {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                        .font(.system(size: 50))
+                                                        .foregroundColor(.white)
+                                                    
+                                                    Text("Feedback Submitted!")
+                                                        .font(.title3)
+                                                        .bold()
+                                                        .foregroundColor(.white)
+                                                    
+                                                    Text("Thank you for your feedback!")
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.gray)
+                                                        .multilineTextAlignment(.center)
+                                                        .padding(.horizontal)
+                                                }
+                                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                                .background(Color.black)
+                                                .ignoresSafeArea()
+                                                .onTapGesture {
+                                                    showFeedbackSuccess = false
+                                                    dismiss()
+                                                }
+                                            }
+                                    }
+                                }
                             }
                             
                             // Reviews section for owned projects
@@ -523,6 +614,18 @@ struct ProjectView: View {
         
         do {
             let feedback = try await FeedbackService.shared.getFeedbackForProject(projectId: projectUUID)
+            
+            // Only mark feedback as seen if the current user is the project owner
+            if let currentUserId = AuthService.shared.currentUser?.id,
+               let project = project,
+               currentUserId == project.userId {
+                for item in feedback {
+                    if item.seenAt == nil {
+                        try await FeedbackService.shared.markFeedbackAsSeen(feedbackId: item.id)
+                    }
+                }
+            }
+            
             await MainActor.run {
                 self.projectFeedback = feedback
                 self.isFeedbackLoading = false
@@ -549,6 +652,7 @@ struct ProjectView: View {
                 await MainActor.run {
                     feedbackText = ""
                     isSubmittingFeedback = false
+                    showFeedbackSuccess = true
                 }
                 // Reload feedback to show the new one
                 await loadFeedback()

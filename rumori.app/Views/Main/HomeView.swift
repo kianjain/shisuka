@@ -134,7 +134,6 @@ struct FeedbackCountCard: View {
             Text("\(count)")
                 .font(.system(size: 72, weight: .semibold))
                 .foregroundColor(.white)
-                // Subtle shadows for depth
                 .shadow(color: Color.black.opacity(0.3), radius: 20, x: -2, y: 2)
                 .shadow(color: Color.white.opacity(0.3), radius: 5, x: 2, y: -2)
             
@@ -391,6 +390,7 @@ struct HomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var projectService: ProjectService
     @StateObject private var auth = AuthService.shared
+    @State private var unreadFeedbackCount: Int = 0
     
     // State for review projects
     @State private var reviewProjects: [ProjectPreview] = []
@@ -401,9 +401,6 @@ struct HomeView: View {
     @State private var recentProjects: [ProjectPreview] = []
     @State private var isLoadingRecentProjects = true
     @State private var recentProjectsError: Error?
-    
-    // Mock data
-    private let newFeedbackCount = 12
     
     // Favorites data
     private let favoriteItems = [
@@ -540,7 +537,7 @@ struct HomeView: View {
                     VStack(spacing: 24) {
                         // Feedback Count Section
                         VStack(spacing: 16) {
-                            FeedbackCountCard(count: newFeedbackCount)
+                            FeedbackCountCard(count: unreadFeedbackCount)
                             
                             LibraryButton {
                                 selectedTab = 3 // Navigate to Library tab
@@ -774,6 +771,24 @@ struct HomeView: View {
         .onAppear {
             loadReviewProjects()
             loadRecentProjects()
+            Task {
+                do {
+                    print("🔄 [HomeView] Fetching unread feedback count...")
+                    unreadFeedbackCount = try await FeedbackService.shared.getUnreadFeedbackCount()
+                    print("✅ [HomeView] Updated unread feedback count to: \(unreadFeedbackCount)")
+                } catch {
+                    print("❌ [HomeView] Error fetching unread feedback count: \(error)")
+                }
+            }
+        }
+        .refreshable {
+            await loadReviewProjects()
+            await loadRecentProjects()
+            do {
+                unreadFeedbackCount = try await FeedbackService.shared.getUnreadFeedbackCount()
+            } catch {
+                print("❌ [HomeView] Error refreshing unread feedback count: \(error)")
+            }
         }
     }
     

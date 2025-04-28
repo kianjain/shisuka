@@ -35,7 +35,9 @@ class AudioService {
             let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer)!
             let length = CMBlockBufferGetDataLength(blockBuffer)
             var data = Data(count: length)
-            CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: length, destination: &data)
+            try data.withUnsafeMutableBytes { buffer in
+                CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: length, destination: buffer.baseAddress!)
+            }
             
             let samplesCount = length / MemoryLayout<Int16>.size
             let int16Samples = data.withUnsafeBytes { $0.bindMemory(to: Int16.self) }
@@ -78,13 +80,17 @@ class AudioService {
         exportSession?.outputURL = outputURL
         exportSession?.outputFileType = .m4a
         
-        try await exportSession?.export()
+        guard let session = exportSession else {
+            throw NSError(domain: "AudioService", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to create export session"])
+        }
+        
+        await session.export()
         
         return outputURL
     }
     
     func getAudioDuration(from url: URL) async throws -> Double {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         return try await asset.load(.duration).seconds
     }
 } 
