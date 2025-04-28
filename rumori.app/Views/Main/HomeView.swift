@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 struct StatsCard: View {
     let title: String
@@ -186,7 +187,7 @@ struct MinimalisticCard: View {
     let action: () -> Void
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
                 Image(systemName: icon)
@@ -197,9 +198,10 @@ struct MinimalisticCard: View {
                     .foregroundColor(.white)
                 Spacer()
             }
+            .padding(.horizontal, 16)
             
             // Items
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 ForEach(items, id: \.id) { item in
                     NavigationLink(destination: ProjectView(projectId: item.id)) {
                         HStack(spacing: 12) {
@@ -244,17 +246,17 @@ struct MinimalisticCard: View {
                                         .foregroundColor(.white)
                                     Spacer()
                                     Text(item.subtitle)
-                                        .font(.caption)
+                                        .font(.subheadline)
                                         .foregroundColor(.gray)
                                 }
                                 
                                 Text(item.description)
-                                    .font(.caption)
+                                    .font(.subheadline)
                                     .foregroundColor(.gray)
                                     .lineLimit(1)
                             }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 16)
                     }
                 }
             }
@@ -270,10 +272,11 @@ struct MinimalisticCard: View {
                         .font(.caption)
                 }
                 .foregroundColor(.white)
+                .padding(.horizontal, 16)
                 .padding(.top, 8)
             }
         }
-        .padding()
+        .padding(.vertical, 16)
         .background(
             Color(red: 0.08, green: 0.08, blue: 0.08)
             .background(.ultraThinMaterial)
@@ -401,6 +404,11 @@ struct HomeView: View {
     @State private var recentProjects: [ProjectPreview] = []
     @State private var isLoadingRecentProjects = true
     @State private var recentProjectsError: Error?
+    
+    // Notifications state
+    @State private var notifications: [NotificationItem] = []
+    @State private var isLoadingNotifications = true
+    @State private var notificationsError: Error?
     
     // Favorites data
     private let favoriteItems = [
@@ -534,7 +542,7 @@ struct HomeView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 20) {
                         // Feedback Count Section
                         VStack(spacing: 16) {
                             FeedbackCountCard(count: unreadFeedbackCount)
@@ -543,7 +551,7 @@ struct HomeView: View {
                                 selectedTab = 3 // Navigate to Library tab
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 16)
                         
                         // Earn Rumors Section
                         VStack(alignment: .leading, spacing: 16) {
@@ -551,7 +559,7 @@ struct HomeView: View {
                                 .font(.title2)
                                 .bold()
                                 .foregroundColor(.white)
-                                .padding(.horizontal)
+                                .padding(.horizontal, 16)
                             
                             if isLoadingReviewProjects {
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -632,98 +640,317 @@ struct HomeView: View {
                             }
                         }
                         
-                        // Minimalistic Cards Section
-                        VStack(spacing: 12) {
-                            if isLoadingRecentProjects {
-                                MinimalisticCard(
-                                    title: "Recent Projects",
-                                    icon: "clock.fill",
-                                    items: [
-                                        MinimalisticCardItem(
-                                            id: "Loading...",
-                                            name: "Loading...",
-                                            subtitle: "",
-                                            description: "Fetching your recent projects",
-                                            imageUrl: nil,
-                                            type: "doc"
-                                        )
-                                    ],
-                                    color: .black,
-                                    actionTitle: "View All Projects",
-                                    action: {
-                                        selectedTab = 3 // Navigate to Library tab
-                                    }
-                                )
-                            } else if recentProjects.isEmpty {
-                                MinimalisticCard(
-                                    title: "Recent Projects",
-                                    icon: "clock.fill",
-                                    items: [
-                                        MinimalisticCardItem(
-                                            id: "No Projects Yet",
-                                            name: "No Projects Yet",
-                                            subtitle: "",
-                                            description: "Upload your first project to get started",
-                                            imageUrl: nil,
-                                            type: "nosign"
-                                        )
-                                    ],
-                                    color: .black,
-                                    actionTitle: "Upload Project",
-                                    action: {
-                                        selectedTab = 1 // Navigate to Upload tab
-                                    }
-                                )
-                            } else {
-                                MinimalisticCard(
-                                    title: "Recent Projects",
-                                    icon: "clock.fill",
-                                    items: recentProjects.map { project in
-                                        MinimalisticCardItem(
-                                            id: project.id.uuidString,
-                                            name: project.name,
-                                            subtitle: project.uploadDate.formatted(date: .abbreviated, time: .omitted),
-                                            description: project.description,
-                                            imageUrl: project.imageUrl,
-                                            type: project.fileType
-                                        )
-                                    },
-                                    color: .black,
-                                    actionTitle: "View All Projects",
-                                    action: {
-                                        selectedTab = 3 // Navigate to Library tab
-                                    }
-                                )
-                            }
-                            
-                            MinimalisticCard(
-                                title: "Notifications",
-                                icon: "bell.fill",
-                                items: notificationItems,
-                                color: .black,
-                                actionTitle: "View All Notifications",
-                                action: {
-                                    // Show notifications sheet
+                        // Notifications Card
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text("Notifications")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                                
+                                Button(action: {
                                     showingNotifications = true
+                                }) {
+                                    Text("View All")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
                                 }
-                            )
+                            }
+                            .padding(.horizontal, 16)
                             
-                            MinimalisticCard(
-                                title: "Favorites",
-                                icon: "star.fill",
-                                items: favoriteItems,
-                                color: .black,
-                                actionTitle: "View All Favorites",
-                                action: {
-                                    // Handle favorites action
+                            if isLoadingNotifications {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                            } else if let error = notificationsError {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.red)
+                                    Text("Error loading notifications")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
                                 }
-                            )
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                            } else if notifications.isEmpty {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "bell.slash")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.gray)
+                                    Text("No notifications yet")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                            } else {
+                                VStack(spacing: 16) {
+                                    ForEach(notifications.prefix(3)) { notification in
+                                        HStack(spacing: 12) {
+                                            // Project Image or Profile Picture
+                                            if let projectImage = notification.projectImage {
+                                                if notification.action == "just reviewed" {
+                                                    // Circular profile picture for feedback
+                                                    AsyncImage(url: projectImage) { image in
+                                                        image
+                                                            .resizable()
+                                                            .aspectRatio(contentMode: .fill)
+                                                            .frame(width: 56, height: 56)
+                                                            .clipShape(Circle())
+                                                    } placeholder: {
+                                                        Circle()
+                                                            .fill(Color.gray.opacity(0.3))
+                                                            .frame(width: 56, height: 56)
+                                                    }
+                                                } else {
+                                                    // Regular project image for uploads
+                                                    AsyncImage(url: projectImage) { image in
+                                                        image
+                                                            .resizable()
+                                                            .aspectRatio(contentMode: .fill)
+                                                            .frame(width: 56, height: 56)
+                                                            .cornerRadius(10)
+                                                    } placeholder: {
+                                                        Rectangle()
+                                                            .fill(Color.gray.opacity(0.3))
+                                                            .frame(width: 56, height: 56)
+                                                            .cornerRadius(10)
+                                                    }
+                                                }
+                                            } else {
+                                                Rectangle()
+                                                    .fill(Color.gray.opacity(0.3))
+                                                    .frame(width: 56, height: 56)
+                                                    .cornerRadius(10)
+                                                    .overlay(
+                                                        Image(systemName: notification.action == "just reviewed" ? "person.fill" : "doc.fill")
+                                                            .font(.system(size: 20))
+                                                            .foregroundColor(.white.opacity(0.5))
+                                                    )
+                                            }
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                HStack {
+                                                    Text(notification.userName)
+                                                        .font(.subheadline)
+                                                        .fontWeight(.medium)
+                                                        .foregroundColor(.white)
+                                                    
+                                                    Spacer()
+                                                    
+                                                    Text(notification.timeAgo)
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.gray)
+                                                }
+                                                
+                                                if notification.action == "uploaded" {
+                                                    Text("was successfully uploaded!")
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.gray)
+                                                } else {
+                                                    HStack(spacing: 0) {
+                                                        Text("just reviewed ")
+                                                            .font(.subheadline)
+                                                            .foregroundColor(.gray)
+                                                        
+                                                        Text(notification.projectName)
+                                                            .font(.subheadline)
+                                                            .fontWeight(.medium)
+                                                            .foregroundColor(.gray)
+                                                        
+                                                        Text("!")
+                                                            .font(.subheadline)
+                                                            .foregroundColor(.gray)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        .padding(.horizontal)
+                                    }
+                                }
+                            }
                         }
-                        .padding(.horizontal)
+                        .padding(.vertical, 16)
+                        .background(
+                            Color(red: 0.08, green: 0.08, blue: 0.08)
+                            .background(.ultraThinMaterial)
+                        )
+                        .cornerRadius(16)
+                        .padding(.horizontal, 16)
+                        
+                        // Minimalistic Cards Section
+                        VStack(spacing: 16) {
+                            if isLoadingRecentProjects {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    HStack {
+                                        Text("Recent Projects")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                        
+                                        Spacer()
+                                        
+                                        Button(action: {
+                                            selectedTab = 3 // Navigate to Library tab
+                                        }) {
+                                            Text("View All")
+                                                .font(.subheadline)
+                                                .foregroundColor(.gray)
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
+                                    
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                }
+                                .padding(.vertical, 16)
+                                .background(
+                                    Color(red: 0.08, green: 0.08, blue: 0.08)
+                                    .background(.ultraThinMaterial)
+                                )
+                                .cornerRadius(16)
+                            } else if recentProjects.isEmpty {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    HStack {
+                                        Text("Recent Projects")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                        
+                                        Spacer()
+                                        
+                                        Button(action: {
+                                            selectedTab = 1 // Navigate to Upload tab
+                                        }) {
+                                            Text("Upload Project")
+                                                .font(.subheadline)
+                                                .foregroundColor(.gray)
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
+                                    
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "nosign")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(.gray)
+                                        Text("No projects yet")
+                                            .font(.subheadline)
+                                            .foregroundColor(.gray)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                }
+                                .padding(.vertical, 16)
+                                .background(
+                                    Color(red: 0.08, green: 0.08, blue: 0.08)
+                                    .background(.ultraThinMaterial)
+                                )
+                                .cornerRadius(16)
+                            } else {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    HStack {
+                                        Text("Recent Projects")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                        
+                                        Spacer()
+                                        
+                                        Button(action: {
+                                            selectedTab = 3 // Navigate to Library tab
+                                        }) {
+                                            Text("View All")
+                                                .font(.subheadline)
+                                                .foregroundColor(.gray)
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
+                                    
+                                    VStack(spacing: 16) {
+                                        ForEach(recentProjects.prefix(3)) { project in
+                                            NavigationLink(destination: ProjectView(projectId: project.id.uuidString)) {
+                                                HStack(spacing: 12) {
+                                                    // Project Image
+                                                    if let imageUrl = project.imageUrl {
+                                                        AsyncImage(url: imageUrl) { image in
+                                                            image
+                                                                .resizable()
+                                                                .aspectRatio(contentMode: .fill)
+                                                                .frame(width: 56, height: 56)
+                                                                .cornerRadius(10)
+                                                        } placeholder: {
+                                                            Rectangle()
+                                                                .fill(Color.gray.opacity(0.3))
+                                                                .frame(width: 56, height: 56)
+                                                                .cornerRadius(10)
+                                                                .overlay(
+                                                                    Image(systemName: getFileTypeIcon(for: project.fileType))
+                                                                        .font(.system(size: 20))
+                                                                        .foregroundColor(.white.opacity(0.5))
+                                                                )
+                                                        }
+                                                    } else {
+                                                        Rectangle()
+                                                            .fill(Color.gray.opacity(0.3))
+                                                            .frame(width: 56, height: 56)
+                                                            .cornerRadius(10)
+                                                            .overlay(
+                                                                Image(systemName: getFileTypeIcon(for: project.fileType))
+                                                                    .font(.system(size: 20))
+                                                                    .foregroundColor(.white.opacity(0.5))
+                                                            )
+                                                    }
+                                                    
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        HStack {
+                                                            Text(project.name)
+                                                                .font(.subheadline)
+                                                                .fontWeight(.medium)
+                                                                .foregroundColor(.white)
+                                                            
+                                                            Spacer()
+                                                            
+                                                            Text(project.uploadDate.formatted(date: .abbreviated, time: .omitted))
+                                                                .font(.subheadline)
+                                                                .foregroundColor(.gray)
+                                                        }
+                                                        
+                                                        Text(project.description)
+                                                            .font(.subheadline)
+                                                            .foregroundColor(.gray)
+                                                            .lineLimit(1)
+                                                    }
+                                                }
+                                                .padding(.horizontal, 16)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 16)
+                                .background(
+                                    Color(red: 0.08, green: 0.08, blue: 0.08)
+                                    .background(.ultraThinMaterial)
+                                )
+                                .cornerRadius(16)
+                            }
+                        }
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.bottom)
+                    .padding(.bottom, 16)
                 }
                 .scrollIndicators(.hidden)
+                .refreshable {
+                    await loadReviewProjects()
+                    await loadRecentProjects()
+                    loadNotifications()
+                    do {
+                        unreadFeedbackCount = try await FeedbackService.shared.getUnreadFeedbackCount()
+                    } catch {
+                        print("❌ [HomeView] Error refreshing unread feedback count: \(error)")
+                    }
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -761,16 +988,17 @@ struct HomeView: View {
             .sheet(isPresented: $showingNotifications) {
                 ActivityView()
             }
-            .sheet(isPresented: $showingProfile) {
-                ProfileView()
-            }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            .sheet(isPresented: $showingProfile) {
+                ProfileView()
             }
         }
         .onAppear {
             loadReviewProjects()
             loadRecentProjects()
+            loadNotifications()
             Task {
                 do {
                     print("🔄 [HomeView] Fetching unread feedback count...")
@@ -779,15 +1007,6 @@ struct HomeView: View {
                 } catch {
                     print("❌ [HomeView] Error fetching unread feedback count: \(error)")
                 }
-            }
-        }
-        .refreshable {
-            await loadReviewProjects()
-            await loadRecentProjects()
-            do {
-                unreadFeedbackCount = try await FeedbackService.shared.getUnreadFeedbackCount()
-            } catch {
-                print("❌ [HomeView] Error refreshing unread feedback count: \(error)")
             }
         }
     }
@@ -902,6 +1121,61 @@ struct HomeView: View {
             return profile.username
         }
         return nil
+    }
+    
+    private func loadNotifications() {
+        Task {
+            do {
+                async let uploads = NotificationService.shared.getProjectUploadNotifications()
+                async let feedback = NotificationService.shared.getFeedbackNotifications()
+                
+                let (uploadResults, feedbackResults) = try await (uploads, feedback)
+                
+                // Combine and sort notifications by time
+                let allNotifications = (uploadResults + feedbackResults).sorted { first, second in
+                    // Extract the numeric value and unit from timeAgo strings
+                    let firstValue = Int(first.timeAgo.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0
+                    let secondValue = Int(second.timeAgo.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0
+                    
+                    // If both have the same unit (e.g., both "h ago"), compare the values
+                    if first.timeAgo.contains("h") && second.timeAgo.contains("h") {
+                        return firstValue < secondValue
+                    }
+                    // If one is in hours and the other in days, hours come first
+                    if first.timeAgo.contains("h") && second.timeAgo.contains("d") {
+                        return true
+                    }
+                    if first.timeAgo.contains("d") && second.timeAgo.contains("h") {
+                        return false
+                    }
+                    // If both are in days, compare the values
+                    return firstValue < secondValue
+                }
+                
+                await MainActor.run {
+                    self.notifications = allNotifications
+                    self.isLoadingNotifications = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.notificationsError = error
+                    self.isLoadingNotifications = false
+                }
+            }
+        }
+    }
+    
+    private func getFileTypeIcon(for fileType: String) -> String {
+        switch fileType {
+        case "Audio":
+            return "waveform"
+        case "Images":
+            return "photo"
+        case "Video":
+            return "video"
+        default:
+            return "doc"
+        }
     }
 }
 

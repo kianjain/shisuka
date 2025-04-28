@@ -421,6 +421,15 @@ struct UploadContentView: View {
                 showSuccess = false
             }
         }
+        .sheet(isPresented: $showingNotifications) {
+            ActivityView()
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
+        .sheet(isPresented: $showingProfile) {
+            ProfileView()
+        }
     }
 }
 
@@ -491,20 +500,8 @@ struct UploadView: View {
                 .presentationDetents([.large])
             }
         }
-        .sheet(isPresented: $showingProfile) {
-            NavigationStack {
-                ProfileView()
-            }
-        }
-        .sheet(isPresented: $showingSettings) {
-            NavigationStack {
-                SettingsView()
-            }
-        }
-        .sheet(isPresented: $showingNotifications) {
-            NavigationStack {
-                ActivityView()
-            }
+        .navigationDestination(isPresented: $showingProfile) {
+            ProfileView()
         }
     }
     

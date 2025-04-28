@@ -190,14 +190,14 @@ struct ReviewView: View {
                 }
             }
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-            .sheet(isPresented: $showingProfile) {
-                ProfileView()
+            .sheet(isPresented: $showingNotifications) {
+                ActivityView()
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
-            .sheet(isPresented: $showingNotifications) {
-                ActivityView()
+            .sheet(isPresented: $showingProfile) {
+                ProfileView()
             }
         }
         .onAppear {
