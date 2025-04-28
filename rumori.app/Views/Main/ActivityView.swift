@@ -14,19 +14,35 @@ struct NotificationSection: View {
             VStack(spacing: 24) {
                 ForEach(notifications) { notification in
                     HStack(spacing: 12) {
-                        // Project Image
+                        // Project Image or Profile Picture
                         if let projectImage = notification.projectImage {
-                            AsyncImage(url: projectImage) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 56, height: 56)
-                                    .cornerRadius(6)
-                            } placeholder: {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 56, height: 56)
-                                    .cornerRadius(6)
+                            if notification.action == "just reviewed" {
+                                // Circular profile picture for feedback
+                                AsyncImage(url: projectImage) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 56, height: 56)
+                                        .clipShape(Circle())
+                                } placeholder: {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 56, height: 56)
+                                }
+                            } else {
+                                // Regular project image for uploads
+                                AsyncImage(url: projectImage) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 56, height: 56)
+                                        .cornerRadius(6)
+                                } placeholder: {
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 56, height: 56)
+                                        .cornerRadius(6)
+                                }
                             }
                         }
                         
@@ -38,17 +54,34 @@ struct NotificationSection: View {
                                     .fontWeight(.medium)
                                     .foregroundColor(.white)
                                 
+                                Spacer()
+                                
                                 Text(notification.timeAgo)
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
                             }
                             
-                            Text("\(notification.action) \(notification.projectName)")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
+                            if notification.action == "uploaded" {
+                                Text("was successfully uploaded!")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            } else {
+                                HStack(spacing: 0) {
+                                    Text("just reviewed ")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                    
+                                    Text(notification.projectName)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white)
+                                    
+                                    Text("!")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                }
+                            }
                         }
-                        
-                        Spacer()
                     }
                     .padding(.horizontal)
                 }
@@ -60,48 +93,10 @@ struct NotificationSection: View {
 struct ActivityView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var topBarHeight: CGFloat = 0
-    
-    // Mock data
-    private let thisWeekNotifications = [
-        NotificationItem(
-            userName: "Koyes Ahmed Rumina",
-            action: "liked your track",
-            projectName: "PULSE (prod. urbs)",
-            projectImage: URL(string: "https://example.com/track1.jpg"),
-            timeAgo: "2d"
-        ),
-        NotificationItem(
-            userName: "kris",
-            action: "liked your track",
-            projectName: "Lay Low - Alexa...",
-            projectImage: URL(string: "https://example.com/track2.jpg"),
-            timeAgo: "7d"
-        )
-    ]
-    
-    private let thisMonthNotifications = [
-        NotificationItem(
-            userName: "MrYeetMaster",
-            action: "liked your track",
-            projectName: "Rodd Rigo - Trop...",
-            projectImage: URL(string: "https://example.com/track3.jpg"),
-            timeAgo: "13d"
-        ),
-        NotificationItem(
-            userName: "bliss! archives",
-            action: "liked your track",
-            projectName: "Rodd Rigo - Abo...",
-            projectImage: URL(string: "https://example.com/track4.jpg"),
-            timeAgo: "18d"
-        ),
-        NotificationItem(
-            userName: "Julia Reijnen",
-            action: "liked your track",
-            projectName: "Lay Low - Alexa...",
-            projectImage: URL(string: "https://example.com/track5.jpg"),
-            timeAgo: "25d"
-        )
-    ]
+    @State private var uploadNotifications: [NotificationItem] = []
+    @State private var feedbackNotifications: [NotificationItem] = []
+    @State private var isLoading = true
+    @State private var error: Error?
     
     var body: some View {
         NavigationView {
@@ -110,20 +105,89 @@ struct ActivityView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: 32) {
-                        NotificationSection(title: "This Week", notifications: thisWeekNotifications)
-                        NotificationSection(title: "This Month", notifications: thisMonthNotifications)
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else if let error = error {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 40))
+                            .foregroundColor(.red)
+                        Text("Error loading notifications")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Text(error.localizedDescription)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        Button("Try Again") {
+                            loadNotifications()
+                        }
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 16)
+                } else if uploadNotifications.isEmpty && feedbackNotifications.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "bell.slash")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                        Text("No notifications yet")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Text("When you upload projects or receive feedback, they'll appear here")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                } else {
+                    ScrollView {
+                        VStack(spacing: 32) {
+                            if !feedbackNotifications.isEmpty {
+                                NotificationSection(title: "Recent Feedback", notifications: feedbackNotifications)
+                            }
+                            if !uploadNotifications.isEmpty {
+                                NotificationSection(title: "Recent Uploads", notifications: uploadNotifications)
+                            }
+                        }
+                        .padding(.top, 16)
+                    }
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
             }
             .navigationTitle("Activity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
+                }
+            }
+            .refreshable {
+                await loadNotifications()
+            }
+        }
+        .onAppear {
+            loadNotifications()
+        }
+    }
+    
+    private func loadNotifications() {
+        Task {
+            do {
+                async let uploads = NotificationService.shared.getProjectUploadNotifications()
+                async let feedback = NotificationService.shared.getFeedbackNotifications()
+                
+                let (uploadResults, feedbackResults) = try await (uploads, feedback)
+                
+                await MainActor.run {
+                    self.uploadNotifications = uploadResults
+                    self.feedbackNotifications = feedbackResults
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.error = error
+                    self.isLoading = false
                 }
             }
         }
