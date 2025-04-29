@@ -734,7 +734,7 @@ struct HomeView: View {
                                             
                                             VStack(alignment: .leading, spacing: 4) {
                                                 HStack {
-                                                    Text(notification.userName)
+                                                    Text(notification.projectName)
                                                         .font(.subheadline)
                                                         .fontWeight(.medium)
                                                         .foregroundColor(.white)
@@ -752,11 +752,11 @@ struct HomeView: View {
                                                         .foregroundColor(.gray)
                                                 } else {
                                                     HStack(spacing: 0) {
-                                                        Text("just reviewed ")
+                                                        Text("was reviewed by ")
                                                             .font(.subheadline)
                                                             .foregroundColor(.gray)
                                                         
-                                                        Text(notification.projectName)
+                                                        Text(notification.userName)
                                                             .font(.subheadline)
                                                             .fontWeight(.medium)
                                                             .foregroundColor(.gray)

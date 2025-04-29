@@ -49,7 +49,7 @@ struct NotificationSection: View {
                         // Content
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(notification.userName)
+                                Text(notification.projectName)
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .foregroundColor(.white)
@@ -67,14 +67,14 @@ struct NotificationSection: View {
                                     .foregroundColor(.gray)
                             } else {
                                 HStack(spacing: 0) {
-                                    Text("just reviewed ")
+                                    Text("was reviewed by ")
                                         .font(.subheadline)
                                         .foregroundColor(.gray)
                                     
-                                    Text(notification.projectName)
+                                    Text(notification.userName)
                                         .font(.subheadline)
                                         .fontWeight(.medium)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.gray)
                                     
                                     Text("!")
                                         .font(.subheadline)
@@ -162,6 +162,8 @@ struct ActivityView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .refreshable {
                 await loadNotifications()
             }

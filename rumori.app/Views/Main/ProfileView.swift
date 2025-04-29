@@ -190,6 +190,7 @@ struct ProfileView: View {
                 }
                 .padding(.vertical)
             }
+            .scrollIndicators(.hidden)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
