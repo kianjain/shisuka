@@ -7,6 +7,7 @@ enum AuthError: Error {
     case invalidCredentials
     case emailNotVerified
     case profileNotFound
+    case emailAlreadyExists
 }
 
 class AuthService: ObservableObject {
@@ -143,6 +144,11 @@ class AuthService: ObservableObject {
             await createProfile(for: session.user, username: username)
             isAuthenticated = true
             
+        } catch let error as AuthError {
+            if error.localizedDescription.contains("User already registered") {
+                throw AuthError.emailAlreadyExists
+            }
+            throw error
         } catch {
             print("Error signing up: \(error)")
             self.error = error
@@ -405,6 +411,24 @@ class AuthService: ObservableObject {
         
         // Refresh the profile to get the updated data
         await refreshProfile()
+    }
+    
+    @MainActor
+    func checkUsernameAvailability(_ username: String) async throws -> Bool {
+        do {
+            let response = try await client
+                .from("profiles")
+                .select("username")
+                .eq("username", value: username)
+                .execute()
+            
+            let decoder = JSONDecoder()
+            let profiles = try decoder.decode([Profile].self, from: response.data)
+            return profiles.isEmpty
+        } catch {
+            print("Error checking username availability: \(error)")
+            throw error
+        }
     }
 }
 

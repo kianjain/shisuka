@@ -10,57 +10,67 @@ struct SignInView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
+            VStack(spacing: 0) {
                 // Logo
-                Image("Logo")
+                Image("sh.logo")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 80)
-                    .padding(.top, 40)
+                    .frame(height: 150)
+                    .padding(.top, 80)
+                
+                Spacer()
                 
                 // Form
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
                     TextField("Email", text: $email)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .textContentType(.emailAddress)
                         .autocapitalization(.none)
+                        .padding()
+                        .background(Color.gray.opacity(0.2))
+                        .cornerRadius(10)
+                        .foregroundColor(.white)
+                        .tint(.white)
                     
                     SecureField("Password", text: $password)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .textContentType(.password)
+                        .padding()
+                        .background(Color.gray.opacity(0.2))
+                        .cornerRadius(10)
+                        .foregroundColor(.white)
+                        .tint(.white)
                     
                     Button(action: signIn) {
                         if auth.isLoading {
                             ProgressView()
                                 .progressViewStyle(.circular)
+                                .tint(.white)
                         } else {
                             Text("Sign In")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(.black)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.blue)
+                                .background(Color.white)
                                 .cornerRadius(10)
                         }
                     }
-                    .disabled(auth.isLoading)
+                    .disabled(auth.isLoading || email.isEmpty || password.isEmpty)
+                    .opacity(auth.isLoading || email.isEmpty || password.isEmpty ? 0.5 : 1)
                     
                     Button("Don't have an account? Sign Up") {
                         showingSignUp = true
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(.white)
                 }
                 .padding(.horizontal, 24)
                 
                 Spacer()
+                    .frame(height: 200)
             }
             .background(Color.black)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingSignUp) {
                 SignUpView()
             }
