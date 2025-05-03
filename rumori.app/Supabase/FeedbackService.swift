@@ -20,6 +20,7 @@ class FeedbackService {
             date: Date()
         )
         
+        // First insert the feedback
         try await supabase
             .from("feedback")
             .insert([
@@ -31,7 +32,22 @@ class FeedbackService {
             ])
             .execute()
             
-        print("✅ [Feedback] Feedback submitted successfully")
+        // Then try to earn coins, but don't throw if it fails
+        do {
+            try await CoinService.shared.earnCoins(
+                amount: 1,
+                projectId: projectId,
+                description: "Earned for reviewing a project"
+            )
+            print("✅ [Feedback] Feedback submitted and coins earned successfully")
+        } catch let error as PostgrestError {
+            print("❌ [Feedback] Failed to earn coin - PostgrestError: \(error.message ?? "Unknown error")")
+            print("❌ [Feedback] Error code: \(error.code ?? "No code")")
+            print("❌ [Feedback] Error details: \(error.detail ?? "No details")")
+            print("❌ [Feedback] Error hint: \(error.hint ?? "No hint")")
+        } catch {
+            print("❌ [Feedback] Failed to earn coin - Error: \(error)")
+        }
     }
     
     func getFeedbackForProject(projectId: UUID) async throws -> [FeedbackResponse] {

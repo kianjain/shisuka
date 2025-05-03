@@ -393,6 +393,7 @@ struct HomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var projectService: ProjectService
     @StateObject private var auth = AuthService.shared
+    @StateObject private var coinService = CoinService.shared
     @State private var unreadFeedbackCount: Int = 0
     
     // State for review projects
@@ -961,9 +962,22 @@ struct HomeView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
-                    ProfileButton(size: 32, action: {
-                        showingProfile = true
-                    })
+                    HStack(spacing: 8) {
+                        ProfileButton(size: 32, action: {
+                            showingProfile = true
+                        })
+                        
+                        // Coin Display
+                        HStack(spacing: 8) {
+                            Image("coin")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(height: 32)
+                            Text("\(coinService.balance)")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+                    }
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {

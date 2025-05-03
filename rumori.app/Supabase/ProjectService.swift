@@ -66,14 +66,11 @@ class ProjectService: ObservableObject {
     }
     
     @MainActor
-    func uploadProject(title: String, description: String?, imageData: Data?, audioData: Data?) async throws -> Project {
+    func createProject(title: String, description: String?, imageData: Data?, audioData: Data?) async throws -> Project {
         guard let userId = AuthService.shared.currentUser?.id else {
             throw AuthError.notAuthenticated
         }
         
-        print("📝 Starting project upload for user: \(userId)")
-        
-        // Generate unique filenames using timestamp
         let timestamp = Int(Date().timeIntervalSince1970)
         var imageFilePath: String?
         var audioFilePath: String?
@@ -146,6 +143,23 @@ class ProjectService: ObservableObject {
             
             let project = try decoder.decode(Project.self, from: response.data)
             print("✅ Project created successfully: \(project.title), status: \(project.status.rawValue)")
+            
+            // Now that we have the project ID, try to spend the coin
+            do {
+                try await CoinService.shared.spendCoins(
+                    amount: 1,
+                    projectId: project.id,
+                    description: "Spent to create a new project"
+                )
+                print("✅ Coin spent successfully for project creation")
+            } catch let error as PostgrestError {
+                print("❌ [Project] Failed to spend coin - PostgrestError: \(error.message ?? "Unknown error")")
+                // Don't throw the error since the project was created successfully
+            } catch {
+                print("❌ [Project] Failed to spend coin - Error: \(error)")
+                // Don't throw the error since the project was created successfully
+            }
+            
             return project
             
         } catch {

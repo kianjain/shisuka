@@ -511,30 +511,33 @@ struct UploadView: View {
         
         Task {
             do {
-                _ = try await ProjectService.shared.uploadProject(
+                // Upload the project
+                let project = try await ProjectService.shared.createProject(
                     title: projectName,
                     description: projectDescription.isEmpty ? nil : projectDescription,
                     imageData: viewModel.imageData,
                     audioData: viewModel.audioData
                 )
                 
-                await MainActor.run {
-                    showSuccess = true
-                    // Reset form
-                    projectName = ""
-                    projectDescription = ""
-                    viewModel.imageData = nil
-                    viewModel.audioData = nil
-                    selectedImage = nil
-                    selectedAudio = nil
-                    selectedUploadType = nil
-                    viewModel.selectedAudioURL = nil
+                // Reset form
+                projectName = ""
+                projectDescription = ""
+                viewModel.imageData = nil
+                viewModel.audioData = nil
+                selectedImage = nil
+                selectedAudio = nil
+                
+                // Show success message
+                showSuccess = true
+                
+                // Dismiss the view after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    showSuccess = false
                 }
             } catch {
-                await MainActor.run {
-                    viewModel.errorMessage = error.localizedDescription
-                    viewModel.showError = true
-                }
+                print("❌ [UploadView] Error uploading project: \(error)")
+                viewModel.errorMessage = error.localizedDescription
+                viewModel.showError = true
             }
             
             await MainActor.run {
