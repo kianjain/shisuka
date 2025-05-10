@@ -973,9 +973,15 @@ struct HomeView: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(height: 32)
-                            Text("\(coinService.balance)")
-                                .font(.headline)
-                                .foregroundColor(.white)
+                            if coinService.isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .frame(width: 20, height: 20)
+                            } else {
+                                Text("\(coinService.balance)")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                            }
                         }
                     }
                 }

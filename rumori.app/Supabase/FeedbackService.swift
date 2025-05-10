@@ -56,7 +56,7 @@ class FeedbackService {
         // First, get all feedback for the project
         let feedbackResponse = try await supabase
             .from("feedback")
-            .select("id, project_id, author_id, comment, created_at, seen_at")
+            .select("id, project_id, author_id, comment, created_at, seen_at, helpful_rating")
             .eq("project_id", value: projectId)
             .order("created_at", ascending: false)
             .execute()
@@ -91,7 +91,8 @@ class FeedbackService {
                     comment: item.comment,
                     createdAt: item.createdAt,
                     seenAt: item.seenAt,
-                    author: FeedbackResponse.Profile(username: profile.username)
+                    author: FeedbackResponse.Profile(username: profile.username),
+                    helpfulRating: item.helpfulRating
                 )
                 
                 responses.append(response)
@@ -105,7 +106,8 @@ class FeedbackService {
                     comment: item.comment,
                     createdAt: item.createdAt,
                     seenAt: item.seenAt,
-                    author: FeedbackResponse.Profile(username: "User")
+                    author: FeedbackResponse.Profile(username: "User"),
+                    helpfulRating: item.helpfulRating
                 )
                 responses.append(response)
             }
@@ -122,6 +124,7 @@ class FeedbackService {
         let comment: String
         let createdAt: Date
         let seenAt: String?
+        let helpfulRating: Int?
         
         enum CodingKeys: String, CodingKey {
             case id
@@ -130,6 +133,7 @@ class FeedbackService {
             case comment
             case createdAt = "created_at"
             case seenAt = "seen_at"
+            case helpfulRating = "helpful_rating"
         }
     }
     
@@ -219,30 +223,60 @@ class FeedbackService {
         
         return unreadFeedback.count
     }
-}
-
-// Response type that includes the author's username
-struct FeedbackResponse: Codable, Identifiable {
-    let id: UUID
-    let projectId: UUID
-    let authorId: UUID
-    let comment: String
-    let createdAt: Date
-    let seenAt: String?
-    let author: Profile
     
-    struct Profile: Codable {
-        let username: String
-    }
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case projectId = "project_id"
-        case authorId = "author_id"
-        case comment
-        case createdAt = "created_at"
-        case seenAt = "seen_at"
-        case author
+    func updateHelpfulRating(feedbackId: UUID, rating: Int) async throws {
+        guard let userId = AuthService.shared.currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+        
+        // First get the feedback to check if the user is the project owner
+        let feedbackResponse = try await supabase
+            .from("feedback")
+            .select("project_id")
+            .eq("id", value: feedbackId)
+            .single()
+            .execute()
+            
+        let decoder = JSONDecoder()
+        struct FeedbackData: Codable {
+            let projectId: UUID
+            
+            enum CodingKeys: String, CodingKey {
+                case projectId = "project_id"
+            }
+        }
+        
+        let feedback = try decoder.decode(FeedbackData.self, from: feedbackResponse.data)
+        
+        // Get the project to check ownership
+        let projectResponse = try await supabase
+            .from("projects")
+            .select("user_id")
+            .eq("id", value: feedback.projectId)
+            .single()
+            .execute()
+            
+        struct ProjectData: Codable {
+            let userId: UUID
+            
+            enum CodingKeys: String, CodingKey {
+                case userId = "user_id"
+            }
+        }
+        
+        let project = try decoder.decode(ProjectData.self, from: projectResponse.data)
+        
+        // Only allow project owners to rate feedback
+        guard project.userId == userId else {
+            throw AuthError.notAuthorized
+        }
+        
+        // Update the helpful rating
+        try await supabase
+            .from("feedback")
+            .update(["helpful_rating": rating])
+            .eq("id", value: feedbackId)
+            .execute()
     }
 }
 

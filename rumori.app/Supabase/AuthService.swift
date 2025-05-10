@@ -8,6 +8,7 @@ enum AuthError: Error {
     case emailNotVerified
     case profileNotFound
     case emailAlreadyExists
+    case notAuthorized
 }
 
 class AuthService: ObservableObject {

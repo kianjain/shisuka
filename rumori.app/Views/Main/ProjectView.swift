@@ -211,8 +211,11 @@ private struct ReviewsView: View {
 }
 
 private struct ReviewItemView: View {
-    let review: FeedbackResponse
+    @State var review: FeedbackResponse
     @State private var authorAvatarURL: URL?
+    @State private var isUpdatingRating = false
+    @State private var showError = false
+    @State private var errorMessage = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -261,6 +264,48 @@ private struct ReviewItemView: View {
             Text(review.comment)
                 .font(.body)
                 .foregroundColor(.gray)
+            
+            // Helpful Rating Buttons
+            VStack(spacing: 8) {
+                Text("Helpful?")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                
+                HStack(spacing: 16) {
+                    Spacer()
+                    Button(action: { 
+                        print("😑 Button clicked - Current rating: \(review.helpfulRating ?? -999)")
+                        updateRating(-1) 
+                    }) {
+                        Text("😑")
+                            .font(.title2)
+                            .opacity(review.helpfulRating == -1 ? 1.0 : 0.5)
+                    }
+                    .disabled(isUpdatingRating)
+                    
+                    Button(action: { 
+                        print("🤔 Button clicked - Current rating: \(review.helpfulRating ?? -999)")
+                        updateRating(0) 
+                    }) {
+                        Text("🤔")
+                            .font(.title2)
+                            .opacity(review.helpfulRating == 0 ? 1.0 : 0.5)
+                    }
+                    .disabled(isUpdatingRating)
+                    
+                    Button(action: { 
+                        print("🫡 Button clicked - Current rating: \(review.helpfulRating ?? -999)")
+                        updateRating(1) 
+                    }) {
+                        Text("🫡")
+                            .font(.title2)
+                            .opacity(review.helpfulRating == 1 ? 1.0 : 0.5)
+                    }
+                    .disabled(isUpdatingRating)
+                    Spacer()
+                }
+            }
+            .padding(.top, 8)
         }
         .padding()
         .background(Color(.systemGray6))
@@ -287,6 +332,44 @@ private struct ReviewItemView: View {
             } catch {
                 print("❌ [ProjectView] Error fetching author avatar: \(error)")
             }
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
+    }
+    
+    private func updateRating(_ rating: Int) {
+        print("🔄 [Rating] Starting rating update - Feedback ID: \(review.id), New rating: \(rating)")
+        isUpdatingRating = true
+        
+        Task {
+            do {
+                print("🔄 [Rating] Calling updateHelpfulRating service")
+                try await FeedbackService.shared.updateHelpfulRating(feedbackId: review.id, rating: rating)
+                print("✅ [Rating] Successfully updated rating to \(rating)")
+                
+                // Update the local state with the new rating
+                await MainActor.run {
+                    review = FeedbackResponse(
+                        id: review.id,
+                        projectId: review.projectId,
+                        authorId: review.authorId,
+                        comment: review.comment,
+                        createdAt: review.createdAt,
+                        seenAt: review.seenAt,
+                        author: review.author,
+                        helpfulRating: rating
+                    )
+                }
+            } catch {
+                print("❌ [Rating] Error updating rating: \(error)")
+                errorMessage = error.localizedDescription
+                showError = true
+            }
+            isUpdatingRating = false
+            print("🔄 [Rating] Update completed - isUpdatingRating set to false")
         }
     }
 }
@@ -349,6 +432,7 @@ struct ProjectView: View {
     @State private var showFeedbackError = false
     @State private var projectFeedback: [FeedbackResponse] = []
     @State private var isFeedbackLoading = true
+    @State private var userFeedback: FeedbackResponse?
     
     // Editing states
     @State private var isEditingTitle = false
@@ -507,89 +591,79 @@ struct ProjectView: View {
                             // Feedback input for other users' projects
                             if !isOwnedByUser {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        Text("Your Feedback")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                        
-                                        Spacer()
-                                        
-                                        Text("\(feedbackText.count)/100")
-                                            .font(.caption)
-                                            .foregroundColor(feedbackText.count >= 100 ? .white : .gray)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    
-                                    TextField("Write your feedback...", text: $feedbackText, axis: .vertical)
-                                        .textFieldStyle(PlainTextFieldStyle())
-                                        .foregroundColor(.white)
-                                        .frame(minHeight: 60, alignment: .topLeading)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(12)
-                                        .background(Color(.systemGray6))
-                                        .cornerRadius(12)
-                                    
-                                    Spacer()
-                                        .frame(height: 16)
-                                    
-                                    Button(action: submitFeedback) {
-                                        if isSubmittingFeedback {
-                                            HStack {
-                                                Spacer()
-                                                ProgressView()
-                                                    .progressViewStyle(CircularProgressViewStyle())
-                                                Spacer()
-                                            }
-                                        } else {
-                                            Text("Submit Feedback")
+                                    if let userFeedback = userFeedback {
+                                        // Show user's existing feedback
+                                        VStack(alignment: .leading, spacing: 12) {
+                                            Text("Your Feedback")
                                                 .font(.headline)
                                                 .foregroundColor(.white)
-                                                .frame(maxWidth: .infinity)
-                                                .padding()
-                                                .background(Color.black)
-                                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .stroke(Color.white, lineWidth: 1)
-                                                )
-                                                .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
+                                            
+                                            Text(userFeedback.comment)
+                                                .foregroundColor(.white)
+                                                .padding(12)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .background(Color(.systemGray6))
+                                                .cornerRadius(12)
+                                            
+                                            Text("Submitted on \(userFeedback.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
                                         }
+                                    } else {
+                                        // Show feedback input form
+                                        HStack {
+                                            Text("Your Feedback")
+                                                .font(.headline)
+                                                .foregroundColor(.white)
+                                            
+                                            Spacer()
+                                            
+                                            Text("\(feedbackText.count)/100")
+                                                .font(.caption)
+                                                .foregroundColor(feedbackText.count >= 100 ? .white : .gray)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        TextField("Write your feedback...", text: $feedbackText, axis: .vertical)
+                                            .textFieldStyle(PlainTextFieldStyle())
+                                            .foregroundColor(.white)
+                                            .frame(minHeight: 60, alignment: .topLeading)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(12)
+                                            .background(Color(.systemGray6))
+                                            .cornerRadius(12)
+                                        
+                                        Spacer()
+                                            .frame(height: 16)
+                                        
+                                        Button(action: submitFeedback) {
+                                            if isSubmittingFeedback {
+                                                HStack {
+                                                    Spacer()
+                                                    ProgressView()
+                                                        .progressViewStyle(CircularProgressViewStyle())
+                                                    Spacer()
+                                                }
+                                            } else {
+                                                Text("Submit Feedback")
+                                                    .font(.headline)
+                                                    .foregroundColor(.white)
+                                                    .frame(maxWidth: .infinity)
+                                                    .padding()
+                                                    .background(Color.black)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .stroke(Color.white, lineWidth: 1)
+                                                    )
+                                                    .shadow(color: Color.white.opacity(0.3), radius: 8, x: 0, y: 0)
+                                            }
+                                        }
+                                        .disabled(isSubmittingFeedback || feedbackText.count < 100)
+                                        .opacity(feedbackText.count < 100 ? 0.6 : 1.0)
                                     }
-                                    .disabled(isSubmittingFeedback || feedbackText.count < 100)
-                                    .opacity(feedbackText.count < 100 ? 0.6 : 1.0)
                                 }
                                 .padding(.horizontal)
-                                .overlay {
-                                    if showFeedbackSuccess {
-                                        Color.black
-                                            .ignoresSafeArea()
-                                            .overlay {
-                                                VStack(spacing: 20) {
-                                                    Image(systemName: "checkmark.circle.fill")
-                                                        .font(.system(size: 50))
-                                                        .foregroundColor(.white)
-                                                    
-                                                    Text("Feedback Submitted!")
-                                                        .font(.title3)
-                                                        .bold()
-                                                        .foregroundColor(.white)
-                                                    
-                                                    Text("Thank you for your feedback!")
-                                                        .font(.subheadline)
-                                                        .foregroundColor(.gray)
-                                                        .multilineTextAlignment(.center)
-                                                        .padding(.horizontal)
-                                                }
-                                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                                .background(Color.black)
-                                                .ignoresSafeArea()
-                                                .onTapGesture {
-                                                    showFeedbackSuccess = false
-                                                    dismiss()
-                                                }
-                                            }
-                                    }
-                                }
                             }
                             
                             // Reviews section for owned projects
@@ -756,6 +830,11 @@ struct ProjectView: View {
                         try await FeedbackService.shared.markFeedbackAsSeen(feedbackId: item.id)
                     }
                 }
+            }
+            
+            // Check if current user has already reviewed
+            if let currentUserId = AuthService.shared.currentUser?.id {
+                userFeedback = feedback.first { $0.authorId == currentUserId }
             }
             
             await MainActor.run {

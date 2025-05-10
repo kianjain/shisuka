@@ -11,6 +11,13 @@ struct ProfileView: View {
     @State private var newUsername = ""
     @FocusState private var isUsernameFocused: Bool
     
+    // Stats state
+    @State private var projectCount = 0
+    @State private var reviewedCount = 0
+    @State private var helpfulPercentage = 0
+    @State private var isLoadingStats = true
+    @State private var statsError: Error?
+    
     // Favorites state
     @State private var favoriteProjects: [ProjectPreview] = []
     @State private var isLoadingFavorites = true
@@ -40,6 +47,27 @@ struct ProfileView: View {
             isUsernameFocused = false
         } catch {
             print("❌ [Profile] Error updating username: \(error)")
+        }
+    }
+    
+    private func loadUserStats() async {
+        isLoadingStats = true
+        statsError = nil
+        
+        do {
+            let stats = try await UserStatsService.shared.getUserStats()
+            await MainActor.run {
+                projectCount = stats.projectCount
+                reviewedCount = stats.reviewedCount
+                helpfulPercentage = stats.helpfulPercentage
+                isLoadingStats = false
+            }
+        } catch {
+            print("❌ [Profile] Error loading user stats: \(error)")
+            await MainActor.run {
+                statsError = error
+                isLoadingStats = false
+            }
         }
     }
     
@@ -197,31 +225,46 @@ struct ProfileView: View {
                             // Stats
                             HStack(spacing: 48) {
                                 VStack {
-                                    Text("12")
-                                        .font(.title3)
-                                        .bold()
-                                        .foregroundColor(.white)
+                                    if isLoadingStats {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    } else {
+                                        Text("\(projectCount)")
+                                            .font(.title3)
+                                            .bold()
+                                            .foregroundColor(.white)
+                                    }
                                     Text("Projects")
                                         .font(.caption)
                                         .foregroundColor(.gray)
                                 }
                                 
                                 VStack {
-                                    Text("45")
-                                        .font(.title3)
-                                        .bold()
-                                        .foregroundColor(.white)
-                                    Text("Reviews")
+                                    if isLoadingStats {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    } else {
+                                        Text("\(helpfulPercentage)%")
+                                            .font(.title3)
+                                            .bold()
+                                            .foregroundColor(.white)
+                                    }
+                                    Text("Helpful")
                                         .font(.caption)
                                         .foregroundColor(.gray)
                                 }
                                 
                                 VStack {
-                                    Text("128")
-                                        .font(.title3)
-                                        .bold()
-                                        .foregroundColor(.white)
-                                    Text("Rumors")
+                                    if isLoadingStats {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    } else {
+                                        Text("\(reviewedCount)")
+                                            .font(.title3)
+                                            .bold()
+                                            .foregroundColor(.white)
+                                    }
+                                    Text("Reviewed")
                                         .font(.caption)
                                         .foregroundColor(.gray)
                                 }
@@ -306,6 +349,7 @@ struct ProfileView: View {
                 }
             }
             .task {
+                await loadUserStats()
                 await fetchFavoriteProjects()
             }
         }

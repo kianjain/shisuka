@@ -6,6 +6,7 @@ class CoinService: ObservableObject {
     
     private let client = SupabaseManager.shared.client
     @Published var balance: Int = 0
+    @Published var isLoading: Bool = true
     
     private init() {
         Task { @MainActor in
@@ -22,6 +23,9 @@ class CoinService: ObservableObject {
         guard let userId = AuthService.shared.currentUser?.id else {
             throw AuthError.notAuthenticated
         }
+        
+        isLoading = true
+        defer { isLoading = false }
         
         do {
             let response = try await client
