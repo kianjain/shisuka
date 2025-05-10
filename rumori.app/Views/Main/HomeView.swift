@@ -556,7 +556,7 @@ struct HomeView: View {
                         
                         // Earn Rumors Section
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Earn Rumors")
+                            Text("Earn Coins")
                                 .font(.title2)
                                 .bold()
                                 .foregroundColor(.white)

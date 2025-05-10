@@ -206,7 +206,7 @@ class FeedbackService {
         let feedbackResponse = try await supabase
             .from("feedback")
             .select("id")
-            .in("project_id", value: projects.map { $0.id.uuidString })
+            .in("project_id", values: projects.map { $0.id.uuidString })
             .is("seen_at", value: nil)
             .execute()
             

@@ -321,8 +321,21 @@ struct LibraryView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
-                    ProfileButton(size: 32) {
-                        showingProfile = true
+                    HStack(spacing: 8) {
+                        ProfileButton(size: 32, action: {
+                            showingProfile = true
+                        })
+                        
+                        // Coin Display
+                        HStack(spacing: 8) {
+                            Image("coin")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(height: 32)
+                            Text("\(CoinService.shared.balance)")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
                     }
                 }
                 

@@ -153,7 +153,7 @@ class ProjectService: ObservableObject {
                 )
                 print("✅ Coin spent successfully for project creation")
             } catch let error as PostgrestError {
-                print("❌ [Project] Failed to spend coin - PostgrestError: \(error.message ?? "Unknown error")")
+                print("❌ [Project] Failed to spend coin - PostgrestError: \(error.message)")
                 // Don't throw the error since the project was created successfully
             } catch {
                 print("❌ [Project] Failed to spend coin - Error: \(error)")

@@ -48,49 +48,139 @@ private struct ProjectInfoView: View {
     @FocusState var isTitleFocused: Bool
     let onTitleUpdate: () -> Void
     let username: String
+    @State private var isFavorite: Bool = false
+    @State private var isUpdatingFavorite: Bool = false
+    @State private var authorAvatarURL: URL?
+    let feedbackCount: Int
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Title
-            if isEditingTitle {
-                TextField("Project Title", text: $editedTitle)
-                    .textFieldStyle(.plain)
+            // Title and Favorite Button
+            HStack {
+                if isEditingTitle {
+                    TextField("Project Title", text: $editedTitle)
+                        .textFieldStyle(.plain)
                         .font(.title)
                         .bold()
                         .foregroundColor(.white)
-                    .focused($isTitleFocused)
-                    .onSubmit {
-                        onTitleUpdate()
-                    }
-                    .onAppear {
-                        isTitleFocused = true
-                    }
-            } else {
-                Text(project.title)
-                    .font(.title)
-                    .bold()
-                    .foregroundColor(.white)
-                    .onTapGesture {
-                        if !isReviewMode {
-                            editedTitle = project.title
-                            isEditingTitle = true
+                        .focused($isTitleFocused)
+                        .onSubmit {
+                            onTitleUpdate()
                         }
+                        .onAppear {
+                            isTitleFocused = true
+                        }
+                } else {
+                    Text(project.title)
+                        .font(.title)
+                        .bold()
+                        .foregroundColor(.white)
+                        .onTapGesture {
+                            if !isReviewMode {
+                                editedTitle = project.title
+                                isEditingTitle = true
+                            }
+                        }
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    Task {
+                        isUpdatingFavorite = true
+                        do {
+                            // Toggle the favorite status
+                            let newFavoriteState = try await FavoriteService.shared.toggleFavorite(projectId: project.id)
+                            // Update the UI state
+                            await MainActor.run {
+                                isFavorite = newFavoriteState
+                            }
+                        } catch {
+                            print("❌ [ProjectView] Error toggling favorite: \(error)")
+                        }
+                        isUpdatingFavorite = false
                     }
+                }) {
+                    if isUpdatingFavorite {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: isFavorite ? "heart.fill" : "heart")
+                            .font(.title2)
+                            .foregroundColor(isFavorite ? .red : .gray)
+                    }
+                }
+                .disabled(isUpdatingFavorite)
             }
             
+            // Author and Date
             HStack {
-                Text("by \(username)")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+                // Author Avatar and Name
+                HStack(spacing: 8) {
+                    if let avatarURL = authorAvatarURL {
+                        AsyncImage(url: avatarURL) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Circle()
+                                .fill(Color(.systemGray5))
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                )
+                        }
+                        .frame(width: 24, height: 24)
+                        .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .frame(width: 24, height: 24)
+                            .overlay(
+                                Text(String(username.prefix(1)).uppercased())
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                            )
+                    }
+                    
+                    Text(username)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
                 
                 Spacer()
                 
                 Text(project.createdAt.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)
-                        .foregroundColor(.gray)
+                    .foregroundColor(.gray)
             }
         }
         .padding(.horizontal)
+        .task {
+            do {
+                isFavorite = try await FavoriteService.shared.isProjectFavorited(projectId: project.id)
+                
+                // Fetch author's profile image
+                let response = try await SupabaseManager.shared.client
+                    .from("profiles")
+                    .select("avatar_url")
+                    .eq("id", value: project.userId)
+                    .execute()
+                
+                let decoder = JSONDecoder()
+                struct ProfileResponse: Codable {
+                    let avatar_url: String?
+                }
+                
+                if let profiles = try? decoder.decode([ProfileResponse].self, from: response.data),
+                   let profile = profiles.first,
+                   let avatarUrl = profile.avatar_url {
+                    authorAvatarURL = URL(string: avatarUrl)
+                }
+            } catch {
+                print("❌ [ProjectView] Error checking favorite status or fetching avatar: \(error)")
+            }
+        }
     }
 }
 
@@ -111,32 +201,93 @@ private struct ReviewsView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
             } else {
-                ForEach(feedback) { review in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(review.author.username)
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(.white)
-                            
-                            Spacer()
-                            
-                            Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        
-                        Text(review.comment)
-                            .font(.body)
-                            .foregroundColor(.gray)
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                ForEach(feedback, id: \.id) { review in
+                    ReviewItemView(review: review)
                 }
             }
         }
         .padding()
+    }
+}
+
+private struct ReviewItemView: View {
+    let review: FeedbackResponse
+    @State private var authorAvatarURL: URL?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                // Author Avatar and Name
+                HStack(spacing: 8) {
+                    if let avatarURL = authorAvatarURL {
+                        AsyncImage(url: avatarURL) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Circle()
+                                .fill(Color(.systemGray5))
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                )
+                        }
+                        .frame(width: 24, height: 24)
+                        .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .frame(width: 24, height: 24)
+                            .overlay(
+                                Text(String(review.author.username.prefix(1)).uppercased())
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                            )
+                    }
+                    
+                    Text(review.author.username)
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundColor(.white)
+                }
+                
+                Spacer()
+                
+                Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            
+            Text(review.comment)
+                .font(.body)
+                .foregroundColor(.gray)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .task {
+            do {
+                // Fetch author's profile image
+                let response = try await SupabaseManager.shared.client
+                    .from("profiles")
+                    .select("avatar_url")
+                    .eq("id", value: review.authorId)
+                    .execute()
+                
+                let decoder = JSONDecoder()
+                struct ProfileResponse: Codable {
+                    let avatar_url: String?
+                }
+                
+                if let profiles = try? decoder.decode([ProfileResponse].self, from: response.data),
+                   let profile = profiles.first,
+                   let avatarUrl = profile.avatar_url {
+                    authorAvatarURL = URL(string: avatarUrl)
+                }
+            } catch {
+                print("❌ [ProjectView] Error fetching author avatar: \(error)")
+            }
+        }
     }
 }
 
@@ -300,7 +451,8 @@ struct ProjectView: View {
                                         await updateProjectTitle()
                                     }
                                 },
-                                username: username
+                                username: username,
+                                feedbackCount: projectFeedback.count
                             )
                             
                             // Audio Player
@@ -460,28 +612,8 @@ struct ProjectView: View {
                                                 .frame(maxWidth: .infinity, alignment: .center)
                                                 .padding()
                                         } else {
-                                            ForEach(projectFeedback) { review in
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    HStack {
-                                                        Text(review.author.username)
-                                                            .font(.subheadline)
-                                                            .bold()
-                                                            .foregroundColor(.white)
-                                                        
-                                                        Spacer()
-                                                        
-                                                        Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
-                                                            .font(.caption)
-                                                            .foregroundColor(.gray)
-                                                    }
-                                                    
-                                                    Text(review.comment)
-                                                        .font(.body)
-                                                        .foregroundColor(.gray)
-                                                }
-                                                .padding()
-                                                .background(Color(.systemGray6))
-                                                .cornerRadius(12)
+                                            ForEach(projectFeedback, id: \.id) { review in
+                                                ReviewItemView(review: review)
                                             }
                                         }
                                     }
