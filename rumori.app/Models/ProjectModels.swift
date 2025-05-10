@@ -137,6 +137,7 @@ struct ProjectPreview: Identifiable, Codable {
     let likes: Int
     let isOwnedByUser: Bool
     let lastStatusUpdate: Date?
+    var hasUnreadFeedback: Bool
     
     /// Returns true if the project can be transitioned to the given status
     func canTransition(to newStatus: ProjectStatus) -> Bool {

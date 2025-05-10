@@ -142,7 +142,8 @@ struct ProfileView: View {
                     rumorsSpent: 0,
                     likes: 0,
                     isOwnedByUser: project.userId == userId,
-                    lastStatusUpdate: project.updatedAt
+                    lastStatusUpdate: project.updatedAt,
+                    hasUnreadFeedback: false
                 )
                 projects.append(preview)
             }
@@ -244,7 +245,7 @@ struct ProfileView: View {
                                         ProgressView()
                                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                     } else {
-                                        Text("\(helpfulPercentage)%")
+                                        Text(helpfulPercentage == -1 ? "No data" : "\(helpfulPercentage)%")
                                             .font(.title3)
                                             .bold()
                                             .foregroundColor(.white)

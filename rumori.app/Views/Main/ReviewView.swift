@@ -257,7 +257,8 @@ struct ReviewView: View {
                         rumorsSpent: 0,
                         likes: 0,
                         isOwnedByUser: false,
-                        lastStatusUpdate: project.updatedAt
+                        lastStatusUpdate: project.updatedAt,
+                        hasUnreadFeedback: false
                     )
                     projectPreviews.append(preview)
                 }

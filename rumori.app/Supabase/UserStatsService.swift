@@ -45,10 +45,30 @@ class UserStatsService {
         let reviewedCount = reviews.count
         print("✅ [UserStats] Found \(reviewedCount) reviews given")
         
-        // TODO: Implement actual helpful percentage calculation
-        // For now, return a fixed value of 85%
-        let helpfulPercentage = 85
-        print("✅ [UserStats] Using placeholder helpful percentage: \(helpfulPercentage)%")
+        // Get all feedback given by the user with their helpful ratings
+        let feedbackResponse = try await client
+            .from("feedback")
+            .select("helpful_rating")
+            .eq("author_id", value: userId)
+            .not("helpful_rating", operator: .is, value: "null")
+            .execute()
+        
+        struct FeedbackRating: Codable {
+            let helpfulRating: Int
+            
+            enum CodingKeys: String, CodingKey {
+                case helpfulRating = "helpful_rating"
+            }
+        }
+        
+        let feedbackRatings = try decoder.decode([FeedbackRating].self, from: feedbackResponse.data)
+        
+        // Calculate helpful percentage
+        let totalRatedFeedback = feedbackRatings.count
+        let helpfulFeedback = feedbackRatings.filter { $0.helpfulRating == 1 }.count
+        
+        let helpfulPercentage = totalRatedFeedback > 0 ? Int((Double(helpfulFeedback) / Double(totalRatedFeedback)) * 100) : -1
+        print("✅ [UserStats] Calculated helpful percentage: \(helpfulPercentage == -1 ? "No data" : "\(helpfulPercentage)% (\(helpfulFeedback)/\(totalRatedFeedback))")")
         
         return (projectCount, reviewedCount, helpfulPercentage)
     }

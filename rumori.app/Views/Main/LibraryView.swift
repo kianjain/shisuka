@@ -36,21 +36,9 @@ struct ProjectCard: View {
                                     .fill(Color.gray.opacity(0.3))
                                     .frame(width: 80, height: 80)
                                     .overlay(
-                                        Image(systemName: fileTypeIcon)
+                                        Image(systemName: getFileTypeIcon(for: project.fileType))
                                             .font(.title2)
-                                            .foregroundColor(.gray)
-                                    )
-                                    .onAppear {
-                                        imageError = error
-                                    }
-                            @unknown default:
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 80, height: 80)
-                                    .overlay(
-                                        Image(systemName: fileTypeIcon)
-                                            .font(.title2)
-                                            .foregroundColor(.gray)
+                                            .foregroundColor(.white.opacity(0.5))
                                     )
                             }
                         }
@@ -59,13 +47,24 @@ struct ProjectCard: View {
                             .fill(Color.gray.opacity(0.3))
                             .frame(width: 80, height: 80)
                             .overlay(
-                                Image(systemName: fileTypeIcon)
+                                Image(systemName: getFileTypeIcon(for: project.fileType))
                                     .font(.title2)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.white.opacity(0.5))
                             )
                     }
                 }
                 .cornerRadius(10)
+                .overlay(
+                    Group {
+                        if project.hasUnreadFeedback {
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 12, height: 12)
+                                .offset(x: 4, y: -4)
+                        }
+                    },
+                    alignment: .topTrailing
+                )
                 
                 // Content
                 VStack(alignment: .leading, spacing: 12) {
@@ -86,7 +85,7 @@ struct ProjectCard: View {
                     }
                     
                     // File type
-                    Label(project.fileType, systemImage: fileTypeIcon)
+                    Label(project.fileType, systemImage: getFileTypeIcon(for: project.fileType))
                         .font(.caption)
                         .foregroundColor(.gray)
                     
@@ -160,6 +159,17 @@ struct ProjectCard: View {
     
     private var fileTypeIcon: String {
         switch project.fileType {
+        case "Audio":
+            return "waveform"
+        case "Images":
+            return "photo"
+        default:
+            return "doc"
+        }
+    }
+    
+    private func getFileTypeIcon(for fileType: String) -> String {
+        switch fileType {
         case "Audio":
             return "waveform"
         case "Images":
@@ -444,7 +454,8 @@ struct LibraryView: View {
                         rumorsSpent: 0,
                         likes: 0,
                         isOwnedByUser: true,
-                        lastStatusUpdate: project.updatedAt
+                        lastStatusUpdate: project.updatedAt,
+                        hasUnreadFeedback: feedback.contains { $0.seenAt == nil }
                     )
                     
                     newProjects.append(projectPreview)

@@ -509,7 +509,8 @@ struct HomeView: View {
             rumorsSpent: 0,
             likes: 12,
             isOwnedByUser: false,
-            lastStatusUpdate: nil
+            lastStatusUpdate: nil,
+            hasUnreadFeedback: false
         ),
         ProjectPreview(
             id: UUID(),
@@ -531,7 +532,8 @@ struct HomeView: View {
             rumorsSpent: 0,
             likes: 8,
             isOwnedByUser: true,
-            lastStatusUpdate: nil
+            lastStatusUpdate: nil,
+            hasUnreadFeedback: false
         )
     ]
     
@@ -1064,7 +1066,8 @@ struct HomeView: View {
                         rumorsSpent: 0,
                         likes: 0,
                         isOwnedByUser: false,
-                        lastStatusUpdate: project.updatedAt
+                        lastStatusUpdate: project.updatedAt,
+                        hasUnreadFeedback: false
                     )
                     projectPreviews.append(preview)
                 }
@@ -1107,7 +1110,8 @@ struct HomeView: View {
                         rumorsSpent: 0,
                         likes: 0,
                         isOwnedByUser: true,
-                        lastStatusUpdate: project.updatedAt
+                        lastStatusUpdate: project.updatedAt,
+                        hasUnreadFeedback: false
                     )
                     projectPreviews.append(preview)
                 }
