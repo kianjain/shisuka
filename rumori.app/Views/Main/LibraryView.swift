@@ -330,12 +330,8 @@ struct LibraryView: View {
                         .foregroundColor(.white)
                 }
                 
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 8) {
-                        ProfileButton(size: 32, action: {
-                            showingProfile = true
-                        })
-                        
                         // Coin Display
                         HStack(spacing: 8) {
                             Image("coin")
@@ -352,22 +348,26 @@ struct LibraryView: View {
                                     .foregroundColor(.white)
                             }
                         }
+                        
+                        ProfileButton(size: 32, action: {
+                            showingProfile = true
+                        })
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     HStack(spacing: 16) {
-                        Button(action: {
-                            showingSettings = true
-                        }) {
-                            Image(systemName: "gear")
-                                .foregroundColor(.white)
-                        }
-                        
                         Button(action: {
                             showingNotifications = true
                         }) {
                             Image(systemName: "bell.badge.fill")
+                                .foregroundColor(.white)
+                        }
+                        
+                        Button(action: {
+                            showingSettings = true
+                        }) {
+                            Image(systemName: "gear")
                                 .foregroundColor(.white)
                         }
                     }
@@ -377,14 +377,14 @@ struct LibraryView: View {
             .sheet(isPresented: $showingUploadSheet) {
                 UploadView()
             }
-            .sheet(isPresented: $showingProfile) {
-                ProfileView()
+            .sheet(isPresented: $showingNotifications) {
+                ActivityView()
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
-            .sheet(isPresented: $showingNotifications) {
-                ActivityView()
+            .navigationDestination(isPresented: $showingProfile) {
+                ProfileView()
             }
             .alert("Delete Project", isPresented: $showingDeleteAlert) {
                 Button("Cancel", role: .cancel) { }

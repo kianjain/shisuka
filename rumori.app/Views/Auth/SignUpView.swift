@@ -6,10 +6,10 @@ struct SignUpView: View {
     @State private var password = ""
     @State private var username = ""
     @State private var showingError = false
+    @State private var errorMessage = ""
     @State private var showingConfirmation = false
     @State private var isUsernameAvailable: Bool? = nil
     @State private var isCheckingUsername = false
-    @State private var errorMessage: String? = nil
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -40,14 +40,6 @@ struct SignUpView: View {
                         .cornerRadius(10)
                         .foregroundColor(.white)
                         .tint(.white)
-                    
-                    if let errorMessage = errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .font(.system(size: 14))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 4)
-                    }
                     
                     HStack {
                         TextField("Username", text: $username)
@@ -81,26 +73,55 @@ struct SignUpView: View {
                         }
                     }
                     
-                    SecureField("Password", text: $password)
-                        .textFieldStyle(.plain)
-                        .textContentType(.newPassword)
-                        .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(10)
-                        .foregroundColor(.white)
-                        .tint(.white)
-                    
-                    Button(action: { showingConfirmation = true }) {
-                        Text("Next")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                            .frame(maxWidth: .infinity)
+                    HStack {
+                        SecureField("Password", text: $password)
+                            .textFieldStyle(.plain)
+                            .textContentType(.newPassword)
                             .padding()
-                            .background(Color.white)
+                            .background(Color.gray.opacity(0.2))
                             .cornerRadius(10)
+                            .foregroundColor(.white)
+                            .tint(.white)
+                            .onChange(of: password) { oldValue, newValue in
+                                checkPasswordStrength()
+                            }
+                        
+                        if !password.isEmpty {
+                            Image(systemName: password.count >= 8 ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundColor(password.count >= 8 ? .green : .red)
+                                .frame(width: 24, height: 24)
+                                .padding(16)
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(10)
+                        }
                     }
-                    .disabled(!(isUsernameAvailable ?? false) || username.isEmpty || email.isEmpty || password.isEmpty)
-                    .opacity((isUsernameAvailable ?? false) && !username.isEmpty && !email.isEmpty && !password.isEmpty ? 1 : 0.5)
+                    
+                    Text("Password must be at least 8 characters long")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
+                        .padding(.top, -12)
+                    
+                    Button(action: signUp) {
+                        HStack {
+                            if auth.isLoading {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.black)
+                            } else {
+                                Text("Sign Up")
+                                    .font(.headline)
+                                    .foregroundColor(.black)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(10)
+                    }
+                    .disabled(auth.isLoading || !(isUsernameAvailable ?? false) || username.isEmpty || email.isEmpty || password.isEmpty || password.count < 8)
+                    .opacity(auth.isLoading || !(isUsernameAvailable ?? false) || username.isEmpty || email.isEmpty || password.isEmpty || password.count < 8 ? 0.5 : 1)
                 }
                 .padding(.horizontal, 24)
                 
@@ -112,7 +133,7 @@ struct SignUpView: View {
             .alert("Error", isPresented: $showingError) {
                 Button("OK") {}
             } message: {
-                Text(auth.error?.localizedDescription ?? "An unknown error occurred")
+                Text(errorMessage)
             }
             .navigationDestination(isPresented: $showingConfirmation) {
                 SignUpConfirmationView(
@@ -139,10 +160,37 @@ struct SignUpView: View {
                 let isAvailable = try await auth.checkUsernameAvailability(username)
                 isUsernameAvailable = isAvailable
             } catch {
-                // Silently handle the error by marking username as not available
                 isUsernameAvailable = false
             }
             isCheckingUsername = false
+        }
+    }
+    
+    private func checkPasswordStrength() {
+        // Password requirements:
+        // - At least 8 characters long
+        // This function is called by the onChange modifier on the password field
+        // The visual feedback is handled directly in the view
+    }
+    
+    private func signUp() {
+        Task {
+            do {
+                try await auth.signUp(email: email, password: password, username: username)
+                showingConfirmation = true
+            } catch {
+                if let authError = error as? AuthError {
+                    switch authError {
+                    case .emailAlreadyExists:
+                        errorMessage = "This email is already registered"
+                    default:
+                        errorMessage = "An error occurred during sign up"
+                    }
+                } else {
+                    errorMessage = error.localizedDescription
+                }
+                showingError = true
+            }
         }
     }
 }
@@ -164,11 +212,18 @@ struct SignUpConfirmationView: View {
                     .font(.system(size: 32, weight: .bold))
                     .foregroundColor(.white)
                 
-                Text("We'll send a confirmation link to your email address. Please check your inbox and click the link to verify your account.")
-                    .font(.system(size: 16))
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                VStack(spacing: 16) {
+                    Text("If this is your first time signing up, we'll send a confirmation link to your email address. Please check your inbox and click the link to verify your account.")
+                        .font(.system(size: 16))
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("If you're already registered, you will not receive a verification email. You can proceed directly by clicking the Done button below.")
+                        .font(.system(size: 16))
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 32)
             }
             .padding(.top, 100)
             

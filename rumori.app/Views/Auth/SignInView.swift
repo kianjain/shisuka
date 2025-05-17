@@ -6,6 +6,7 @@ struct SignInView: View {
     @State private var password = ""
     @State private var showingSignUp = false
     @State private var showingError = false
+    @State private var errorMessage = ""
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -42,19 +43,21 @@ struct SignInView: View {
                         .tint(.white)
                     
                     Button(action: signIn) {
-                        if auth.isLoading {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .tint(.white)
-                        } else {
-                            Text("Sign In")
-                                .font(.headline)
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.white)
-                                .cornerRadius(10)
+                        HStack {
+                            if auth.isLoading {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.black)
+                            } else {
+                                Text("Sign In")
+                                    .font(.headline)
+                                    .foregroundColor(.black)
+                            }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(10)
                     }
                     .disabled(auth.isLoading || email.isEmpty || password.isEmpty)
                     .opacity(auth.isLoading || email.isEmpty || password.isEmpty ? 0.5 : 1)
@@ -77,7 +80,7 @@ struct SignInView: View {
             .alert("Error", isPresented: $showingError) {
                 Button("OK") {}
             } message: {
-                Text(auth.error?.localizedDescription ?? "An unknown error occurred")
+                Text(errorMessage)
             }
         }
     }
@@ -88,6 +91,18 @@ struct SignInView: View {
                 try await auth.signIn(email: email, password: password)
                 dismiss()
             } catch {
+                if let authError = error as? AuthError {
+                    switch authError {
+                    case .invalidCredentials:
+                        errorMessage = "Invalid email or password"
+                    case .emailNotVerified:
+                        errorMessage = "Please verify your email before signing in"
+                    default:
+                        errorMessage = "An error occurred during sign in"
+                    }
+                } else {
+                    errorMessage = error.localizedDescription
+                }
                 showingError = true
             }
         }

@@ -165,12 +165,8 @@ struct ReviewView: View {
                         .foregroundColor(.white)
                 }
                 
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 8) {
-                        ProfileButton(size: 32, action: {
-                            showingProfile = true
-                        })
-                        
                         // Coin Display
                         HStack(spacing: 8) {
                             Image("coin")
@@ -187,22 +183,26 @@ struct ReviewView: View {
                                     .foregroundColor(.white)
                             }
                         }
+                        
+                        ProfileButton(size: 32, action: {
+                            showingProfile = true
+                        })
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     HStack(spacing: 16) {
-                        Button(action: {
-                            showingSettings = true
-                        }) {
-                            Image(systemName: "gear")
-                                .foregroundColor(.white)
-                        }
-                        
                         Button(action: {
                             showingNotifications = true
                         }) {
                             Image(systemName: "bell.badge.fill")
+                                .foregroundColor(.white)
+                        }
+                        
+                        Button(action: {
+                            showingSettings = true
+                        }) {
+                            Image(systemName: "gear")
                                 .foregroundColor(.white)
                         }
                     }
@@ -215,8 +215,19 @@ struct ReviewView: View {
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
-            .sheet(isPresented: $showingProfile) {
+            .navigationDestination(isPresented: $showingProfile) {
                 ProfileView()
+                    .navigationBarBackButtonHidden(true)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button {
+                                showingProfile = false
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
             }
         }
         .onAppear {

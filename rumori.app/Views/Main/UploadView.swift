@@ -329,6 +329,7 @@ struct UploadContentView: View {
     @Binding var showingProfile: Bool
     @Binding var showingSettings: Bool
     @Binding var showingNotifications: Bool
+    @Binding var showingInsufficientCoinsAlert: Bool
     let viewModel: UploadViewModel
     let uploadAction: () -> Void
     
@@ -391,12 +392,8 @@ struct UploadContentView: View {
                     .foregroundColor(.white)
             }
             
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 8) {
-                    ProfileButton(size: 32, action: {
-                        showingProfile = true
-                    })
-                    
                     // Coin Display
                     HStack(spacing: 8) {
                         Image("coin")
@@ -413,22 +410,26 @@ struct UploadContentView: View {
                                 .foregroundColor(.white)
                         }
                     }
+                    
+                    ProfileButton(size: 32, action: {
+                        showingProfile = true
+                    })
                 }
             }
             
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarLeading) {
                 HStack(spacing: 16) {
-                    Button(action: {
-                        showingSettings = true
-                    }) {
-                        Image(systemName: "gear")
-                            .foregroundColor(.white)
-                    }
-                    
                     Button(action: {
                         showingNotifications = true
                     }) {
                         Image(systemName: "bell.badge.fill")
+                            .foregroundColor(.white)
+                    }
+                    
+                    Button(action: {
+                        showingSettings = true
+                    }) {
+                        Image(systemName: "gear")
                             .foregroundColor(.white)
                     }
                 }
@@ -446,8 +447,61 @@ struct UploadContentView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView()
         }
-        .sheet(isPresented: $showingProfile) {
+        .navigationDestination(isPresented: $showingProfile) {
             ProfileView()
+        }
+        .alert("Insufficient Coins", isPresented: $showingInsufficientCoinsAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You need at least 1 coin to upload a project. Please earn more coins by reviewing other projects.")
+        }
+    }
+    
+    private func uploadProject() {
+        guard !projectName.isEmpty else { return }
+        
+        // Check if user has enough coins
+        if CoinService.shared.balance < 1 {
+            showingInsufficientCoinsAlert = true
+            return
+        }
+        
+        isUploading = true
+        
+        Task {
+            do {
+                // Upload the project
+                let project = try await ProjectService.shared.createProject(
+                    title: projectName,
+                    description: projectDescription.isEmpty ? nil : projectDescription,
+                    imageData: viewModel.imageData,
+                    audioData: viewModel.audioData
+                )
+                
+                // Reset form
+                projectName = ""
+                projectDescription = ""
+                viewModel.imageData = nil
+                viewModel.audioData = nil
+                selectedImage = nil
+                selectedAudio = nil
+                
+                // Show success message
+                showSuccess = true
+                
+                // Dismiss the view after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    showSuccess = false
+                }
+            } catch {
+                print("❌ [UploadView] Error uploading project: \(error)")
+                viewModel.errorMessage = error.localizedDescription
+                viewModel.showError = true
+            }
+            
+            await MainActor.run {
+                isUploading = false
+            }
         }
     }
 }
@@ -465,6 +519,7 @@ struct UploadView: View {
     @State private var showingNotifications = false
     @State private var showingImagePicker = false
     @State private var showSuccess = false
+    @State private var showingInsufficientCoinsAlert = false
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: Int = 4
     
@@ -489,6 +544,7 @@ struct UploadView: View {
                 showingProfile: $showingProfile,
                 showingSettings: $showingSettings,
                 showingNotifications: $showingNotifications,
+                showingInsufficientCoinsAlert: $showingInsufficientCoinsAlert,
                 viewModel: viewModel,
                 uploadAction: uploadProject
             )
@@ -522,10 +578,22 @@ struct UploadView: View {
         .navigationDestination(isPresented: $showingProfile) {
             ProfileView()
         }
+        .alert("Insufficient Coins", isPresented: $showingInsufficientCoinsAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You need at least 1 coin to upload a project. Please earn more coins by reviewing other projects.")
+        }
     }
     
     private func uploadProject() {
         guard !projectName.isEmpty else { return }
+        
+        // Check if user has enough coins
+        if CoinService.shared.balance < 1 {
+            showingInsufficientCoinsAlert = true
+            return
+        }
+        
         isUploading = true
         
         Task {

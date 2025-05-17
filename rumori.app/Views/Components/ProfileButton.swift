@@ -3,10 +3,16 @@ import SwiftUI
 struct ProfileButton: View {
     let size: CGFloat
     let action: () -> Void
+    @State private var showingProfile = false
     
     var body: some View {
-        Button(action: action) {
+        Button {
+            showingProfile = true
+        } label: {
             ProfilePicture(size: size, action: nil)
+        }
+        .navigationDestination(isPresented: $showingProfile) {
+            ProfileView()
         }
     }
 }

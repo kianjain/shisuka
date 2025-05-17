@@ -9,7 +9,11 @@ struct ProfileView: View {
     @State private var selectedImage: PhotosPickerItem?
     @State private var isEditingUsername = false
     @State private var newUsername = ""
+    @State private var isCheckingUsername = false
+    @State private var usernameError: String?
+    @State private var showingUsernameError = false
     @FocusState private var isUsernameFocused: Bool
+    @Environment(\.presentationMode) private var presentationMode
     
     // Stats state
     @State private var projectCount = 0
@@ -41,12 +45,28 @@ struct ProfileView: View {
     
     private func updateUsername() async {
         guard !newUsername.isEmpty else { return }
+        
+        // Store the original username
+        let originalUsername = auth.currentProfile?.username ?? "Anonymous"
+        
         do {
+            let isAvailable = try await auth.checkUsernameAvailability(newUsername)
+            if !isAvailable {
+                usernameError = "This username is already taken"
+                showingUsernameError = true
+                newUsername = originalUsername
+                return
+            }
+            
+            // If username is available, update it
             try await auth.updateUsername(newUsername)
             isEditingUsername = false
             isUsernameFocused = false
         } catch {
             print("❌ [Profile] Error updating username: \(error)")
+            usernameError = error.localizedDescription
+            showingUsernameError = true
+            newUsername = originalUsername
         }
     }
     
@@ -158,29 +178,29 @@ struct ProfileView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background
-                Color.black
-                    .ignoresSafeArea()
-                
-                ScrollView {
+        ZStack {
+            // Background
+            Color.black
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Profile Header
                     VStack(spacing: 24) {
-                        // Profile Header
-                        VStack(spacing: 24) {
-                            // Profile Image with Picker
-                            PhotosPicker(selection: $selectedImage, matching: .images) {
-                                ProfilePicture(size: 100, action: nil)
+                        // Profile Image with Picker
+                        PhotosPicker(selection: $selectedImage, matching: .images) {
+                            ProfilePicture(size: 100, action: nil)
+                        }
+                        .task(id: selectedImage) {
+                            if let image = selectedImage {
+                                await uploadProfileImage(image)
                             }
-                            .task(id: selectedImage) {
-                                if let image = selectedImage {
-                                    await uploadProfileImage(image)
-                                }
-                            }
-                            
-                            // User Info
-                            VStack(spacing: 4) {
-                                if isEditingUsername {
+                        }
+                        
+                        // User Info
+                        VStack(spacing: 4) {
+                            if isEditingUsername {
+                                HStack {
                                     TextField("Username", text: $newUsername)
                                         .font(.title2)
                                         .bold()
@@ -196,164 +216,189 @@ struct ProfileView: View {
                                         .onAppear {
                                             isUsernameFocused = true
                                         }
-                                } else {
-                                    if let username = auth.currentProfile?.username {
-                                        Text(username)
-                                            .font(.title2)
-                                            .bold()
-                                            .foregroundColor(.white)
-                                            .onTapGesture {
-                                                newUsername = username
-                                                isEditingUsername = true
-                                            }
-                                    } else {
-                                        Text("Anonymous")
-                                            .font(.title2)
-                                            .bold()
-                                            .foregroundColor(.white)
-                                            .onTapGesture {
-                                                newUsername = ""
-                                                isEditingUsername = true
-                                            }
-                                    }
                                 }
-                                
-                                Text(auth.currentUser?.email ?? "")
-                                    .font(.subheadline)
+                            } else {
+                                if let username = auth.currentProfile?.username {
+                                    Text(username)
+                                        .font(.title2)
+                                        .bold()
+                                        .foregroundColor(.white)
+                                        .onTapGesture {
+                                            newUsername = username
+                                            isEditingUsername = true
+                                        }
+                                } else {
+                                    Text("Anonymous")
+                                        .font(.title2)
+                                        .bold()
+                                        .foregroundColor(.white)
+                                        .onTapGesture {
+                                            newUsername = ""
+                                            isEditingUsername = true
+                                        }
+                                }
+                            }
+                            
+                            Text(auth.currentUser?.email ?? "")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        // Stats
+                        HStack(spacing: 48) {
+                            VStack {
+                                if isLoadingStats {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Text("\(projectCount)")
+                                        .font(.title3)
+                                        .bold()
+                                        .foregroundColor(.white)
+                                }
+                                Text("Projects")
+                                    .font(.caption)
                                     .foregroundColor(.gray)
                             }
                             
-                            // Stats
-                            HStack(spacing: 48) {
-                                VStack {
-                                    if isLoadingStats {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    } else {
-                                        Text("\(projectCount)")
-                                            .font(.title3)
-                                            .bold()
-                                            .foregroundColor(.white)
-                                    }
-                                    Text("Projects")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
+                            VStack {
+                                if isLoadingStats {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Text(helpfulPercentage == -1 ? "No data" : "\(helpfulPercentage)%")
+                                        .font(.title3)
+                                        .bold()
+                                        .foregroundColor(.white)
                                 }
-                                
-                                VStack {
-                                    if isLoadingStats {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    } else {
-                                        Text(helpfulPercentage == -1 ? "No data" : "\(helpfulPercentage)%")
-                                            .font(.title3)
-                                            .bold()
-                                            .foregroundColor(.white)
-                                    }
-                                    Text("Helpful")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                VStack {
-                                    if isLoadingStats {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    } else {
-                                        Text("\(reviewedCount)")
-                                            .font(.title3)
-                                            .bold()
-                                            .foregroundColor(.white)
-                                    }
-                                    Text("Reviewed")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
+                                Text("Helpful")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
                             }
-                            .padding()
+                            
+                            VStack {
+                                if isLoadingStats {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Text("\(reviewedCount)")
+                                        .font(.title3)
+                                        .bold()
+                                        .foregroundColor(.white)
+                                }
+                                Text("Reviewed")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
                         }
                         .padding()
-                        
-                        // Favorites Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Text("Favorites")
-                                    .font(.title3)
-                                    .bold()
-                                    .foregroundColor(.white)
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal)
+                    }
+                    .padding()
+                    
+                    // Favorites Section
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Text("Favorites")
+                                .font(.title3)
+                                .bold()
+                                .foregroundColor(.white)
                             
-                            if isLoadingFavorites {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .frame(height: 200)
-                            } else if let error = favoritesError {
-                                Text("Error loading favorites: \(error.localizedDescription)")
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        
+                        if isLoadingFavorites {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .frame(height: 200)
+                        } else if let error = favoritesError {
+                            VStack(spacing: 16) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 32))
                                     .foregroundColor(.red)
-                                    .padding()
-                            } else if favoriteProjects.isEmpty {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "star")
-                                        .font(.system(size: 32))
-                                        .foregroundColor(.gray)
-                                    Text("No favorites yet")
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                            } else {
-                                // Favorites Grid
-                                LazyVGrid(columns: [
-                                    GridItem(.flexible(), spacing: 16),
-                                    GridItem(.flexible(), spacing: 16)
-                                ], spacing: 16) {
-                                    ForEach(favoriteProjects) { project in
-                                        FavoriteProjectItem(project: project, favoriteProjects: $favoriteProjects)
+                                Text("Error loading favorites")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text(error.localizedDescription)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.center)
+                                Button("Try Again") {
+                                    Task {
+                                        await fetchFavoriteProjects()
                                     }
                                 }
-                                .padding(.horizontal)
+                                .buttonStyle(.bordered)
+                                .tint(.white)
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                        } else if favoriteProjects.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "star")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.gray)
+                                Text("No favorites yet")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                        } else {
+                            // Favorites Grid
+                            LazyVGrid(columns: [
+                                GridItem(.flexible(), spacing: 16),
+                                GridItem(.flexible(), spacing: 16)
+                            ], spacing: 16) {
+                                ForEach(favoriteProjects) { project in
+                                    FavoriteProjectItem(project: project, favoriteProjects: $favoriteProjects)
+                                }
+                            }
+                            .padding(.horizontal)
                         }
                     }
-                    .padding(.vertical)
                 }
-                .scrollIndicators(.hidden)
+                .padding(.vertical)
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .foregroundColor(.white)
-                    }
-                }
-                
-                ToolbarItem(placement: .principal) {
-                    Text("Profile")
-                        .font(.headline)
+            .scrollIndicators(.hidden)
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Profile")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
                         .foregroundColor(.white)
                 }
             }
-            .toolbarBackground(.black, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .onTapGesture {
-                if isEditingUsername {
-                    isEditingUsername = false
-                    isUsernameFocused = false
-                }
-            }
-            .task {
-                await loadUserStats()
-                await fetchFavoriteProjects()
+        }
+        .toolbarBackground(.black, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
+        .onTapGesture {
+            if isEditingUsername {
+                isEditingUsername = false
+                isUsernameFocused = false
             }
         }
+        .task {
+            await loadUserStats()
+            await fetchFavoriteProjects()
+        }
+        .alert("Username Error", isPresented: $showingUsernameError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(usernameError ?? "An unknown error occurred")
+        }
+        .navigationViewStyle(.stack)
     }
 }
 
@@ -365,11 +410,14 @@ struct FavoriteProjectItem: View {
     let project: ProjectPreview
     @Binding var favoriteProjects: [ProjectPreview]
     @State private var isUpdatingFavorite = false
-    @State private var isFavorite = true // Since this is in favorites, it starts as true
+    @State private var isFavorite = true
+    @State private var showingProject = false
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            NavigationLink(destination: ProjectView(projectId: project.id.uuidString)) {
+            Button {
+                showingProject = true
+            } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     ProjectImage(imageUrl: project.imageUrl)
                     
@@ -385,6 +433,7 @@ struct FavoriteProjectItem: View {
                     }
                 }
             }
+            .buttonStyle(PlainButtonStyle())
             
             // Favorite Button
             Button {
@@ -393,7 +442,6 @@ struct FavoriteProjectItem: View {
                     do {
                         isFavorite = try await FavoriteService.shared.toggleFavorite(projectId: project.id)
                         if !isFavorite {
-                            // Remove the project from the favorites list
                             if let index = favoriteProjects.firstIndex(where: { $0.id == project.id }) {
                                 favoriteProjects.remove(at: index)
                             }
@@ -409,7 +457,7 @@ struct FavoriteProjectItem: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .frame(width: 24, height: 24)
                 } else {
-                    Image(systemName: "heart.fill")
+                    Image(systemName: isFavorite ? "heart.fill" : "heart")
                         .font(.system(size: 20))
                         .foregroundColor(.red)
                         .padding(8)
@@ -418,6 +466,14 @@ struct FavoriteProjectItem: View {
                 }
             }
             .padding(8)
+        }
+        .sheet(isPresented: $showingProject) {
+            NavigationStack {
+                ProjectView(projectId: project.id.uuidString)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.black)
         }
     }
 }

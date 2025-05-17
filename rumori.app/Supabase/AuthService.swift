@@ -423,8 +423,12 @@ class AuthService: ObservableObject {
                 .eq("username", value: username)
                 .execute()
             
+            // The response will be an array of profiles with just the username field
             let decoder = JSONDecoder()
-            let profiles = try decoder.decode([Profile].self, from: response.data)
+            struct UsernameResponse: Codable {
+                let username: String
+            }
+            let profiles = try decoder.decode([UsernameResponse].self, from: response.data)
             return profiles.isEmpty
         } catch {
             print("Error checking username availability: \(error)")

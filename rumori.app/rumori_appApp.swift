@@ -15,10 +15,7 @@ struct rumori_appApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if auth.isLoading {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                } else if auth.isAuthenticated {
+                if auth.isAuthenticated {
                     MainTabView()
                         .environmentObject(projectService)
                 } else {
