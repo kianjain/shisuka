@@ -130,34 +130,37 @@
         console.log('Hash:', window.location.hash);
         console.log('Search:', window.location.search);
 
-        // Get the access token from the URL (check both hash and query parameters)
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const queryParams = new URLSearchParams(window.location.search);
-        
-        console.log('Hash Params:', Object.fromEntries(hashParams));
-        console.log('Query Params:', Object.fromEntries(queryParams));
-        
-        const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
-
-        console.log('Access Token:', accessToken);
-        console.log('Refresh Token:', refreshToken);
-
-        if (!accessToken) {
-            document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
-            document.getElementById('submitBtn').disabled = true;
-        }
-
         const supabaseUrl = 'https://qkqgqjqkqkqkqkqk.supabase.co'
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcWdxanFrcWtrcWtrcWtrcWtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk5MjQ0MDAsImV4cCI6MjAyNTUwMDQwMH0.Qkqgqjqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqk'
         const supabase = supabase.createClient(supabaseUrl, supabaseKey)
 
-        // Set the session
-        if (accessToken && refreshToken) {
-            supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken
-            });
+        // Get the code from the URL
+        const queryParams = new URLSearchParams(window.location.search);
+        const code = queryParams.get('code');
+
+        console.log('Code:', code);
+
+        if (!code) {
+            document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
+            document.getElementById('submitBtn').disabled = true;
+        } else {
+            // Exchange the code for a session
+            supabase.auth.exchangeCodeForSession(code)
+                .then(({ data, error }) => {
+                    if (error) {
+                        console.error('Error exchanging code:', error);
+                        document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
+                        document.getElementById('submitBtn').disabled = true;
+                    } else {
+                        console.log('Session established:', data);
+                        document.getElementById('submitBtn').disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
+                    document.getElementById('submitBtn').disabled = true;
+                });
         }
 
         async function updatePassword() {
