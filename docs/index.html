@@ -132,7 +132,16 @@
 
         const supabaseUrl = 'https://qkqgqjqkqkqkqkqk.supabase.co'
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcWdxanFrcWtrcWtrcWtrcWtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk5MjQ0MDAsImV4cCI6MjAyNTUwMDQwMH0.Qkqgqjqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqk'
-        const supabase = supabase.createClient(supabaseUrl, supabaseKey)
+        let supabase;
+
+        // Initialize Supabase client
+        try {
+            supabase = supabase.createClient(supabaseUrl, supabaseKey);
+        } catch (error) {
+            console.error('Error initializing Supabase client:', error);
+            document.getElementById('error').textContent = 'Error initializing the application. Please try again.';
+            document.getElementById('submitBtn').disabled = true;
+        }
 
         // Get the code from the URL
         const queryParams = new URLSearchParams(window.location.search);
@@ -143,7 +152,7 @@
         if (!code) {
             document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
             document.getElementById('submitBtn').disabled = true;
-        } else {
+        } else if (supabase) {
             // Exchange the code for a session
             supabase.auth.exchangeCodeForSession(code)
                 .then(({ data, error }) => {
@@ -164,6 +173,11 @@
         }
 
         async function updatePassword() {
+            if (!supabase) {
+                document.getElementById('error').textContent = 'Error: Application not properly initialized. Please try again.';
+                return;
+            }
+
             const password = document.getElementById('password').value
             const confirmPassword = document.getElementById('confirmPassword').value
             const errorDiv = document.getElementById('error')
@@ -198,7 +212,8 @@
                 document.getElementById('formView').style.display = 'none'
                 document.getElementById('successView').style.display = 'block'
             } catch (error) {
-                errorDiv.textContent = error.message
+                console.error('Error updating password:', error);
+                errorDiv.textContent = error.message || 'An error occurred while updating your password. Please try again.'
                 submitBtn.disabled = false
                 submitBtn.textContent = 'Update Password'
             }
