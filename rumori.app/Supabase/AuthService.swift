@@ -223,9 +223,13 @@ class AuthService: ObservableObject {
         // Store the code verifier in UserDefaults
         UserDefaults.standard.set(codeVerifier, forKey: "password_reset_code_verifier")
         
+        // Create redirect URL with code verifier
+        let baseUrl = "https://kianjain.github.io/shisuka"
+        let redirectUrl = "\(baseUrl)?code_verifier=\(codeVerifier)"
+        
         try await client.auth.resetPasswordForEmail(
             email,
-            redirectTo: URL(string: "https://kianjain.github.io/shisuka")!
+            redirectTo: URL(string: redirectUrl)!
         )
     }
     
