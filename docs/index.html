@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Password - Shisuka</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            margin: 0 0 20px;
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .error {
+            color: #dc3545;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .success {
+            color: #28a745;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .success-icon {
+            color: #28a745;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007AFF;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        #successView {
+            display: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="formView">
+            <h1>Reset Password</h1>
+            <div class="form-group">
+                <label for="password">New Password</label>
+                <input type="password" id="password" required>
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <input type="password" id="confirmPassword" required>
+            </div>
+            <button id="submitBtn" onclick="updatePassword()">Update Password</button>
+            <div id="error" class="error"></div>
+        </div>
+
+        <div id="successView">
+            <div class="success-icon">✓</div>
+            <h1>Password Updated</h1>
+            <p>Your password has been successfully updated. You can now use your new password to sign in to your account.</p>
+            <a href="shisuka://" class="button">Open Shisuka App</a>
+        </div>
+    </div>
+
+    <script>
+        // Get the access token from the URL
+        const urlParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = urlParams.get('access_token');
+        const refreshToken = urlParams.get('refresh_token');
+
+        if (!accessToken) {
+            document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
+            document.getElementById('submitBtn').disabled = true;
+        }
+
+        const supabaseUrl = 'https://qkqgqjqkqkqkqkqk.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcWdxanFrcWtrcWtrcWtrcWtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk5MjQ0MDAsImV4cCI6MjAyNTUwMDQwMH0.Qkqgqjqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqk'
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey)
+
+        // Set the session
+        if (accessToken && refreshToken) {
+            supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+            });
+        }
+
+        async function updatePassword() {
+            const password = document.getElementById('password').value
+            const confirmPassword = document.getElementById('confirmPassword').value
+            const errorDiv = document.getElementById('error')
+            const submitBtn = document.getElementById('submitBtn')
+
+            // Clear previous messages
+            errorDiv.textContent = ''
+
+            // Validate passwords
+            if (password !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match'
+                return
+            }
+
+            if (password.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters long'
+                return
+            }
+
+            // Disable button and show loading state
+            submitBtn.disabled = true
+            submitBtn.textContent = 'Updating...'
+
+            try {
+                const { error } = await supabase.auth.updateUser({
+                    password: password
+                })
+
+                if (error) throw error
+
+                // Show success view
+                document.getElementById('formView').style.display = 'none'
+                document.getElementById('successView').style.display = 'block'
+            } catch (error) {
+                errorDiv.textContent = error.message
+                submitBtn.disabled = false
+                submitBtn.textContent = 'Update Password'
+            }
+        }
+    </script>
+</body>
+</html> 
