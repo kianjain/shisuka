@@ -125,10 +125,14 @@
     </div>
 
     <script>
-        // Get the access token from the URL
-        const urlParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = urlParams.get('access_token');
-        const refreshToken = urlParams.get('refresh_token');
+        // Get the access token from the URL (check both hash and query parameters)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const queryParams = new URLSearchParams(window.location.search);
+        const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+
+        console.log('Access Token:', accessToken); // Debug log
+        console.log('Refresh Token:', refreshToken); // Debug log
 
         if (!accessToken) {
             document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
