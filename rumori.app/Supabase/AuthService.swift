@@ -225,8 +225,7 @@ class AuthService: ObservableObject {
         
         try await client.auth.resetPasswordForEmail(
             email,
-            redirectTo: URL(string: "https://kianjain.github.io/shisuka")!,
-            data: ["code_verifier": codeVerifier]
+            redirectTo: URL(string: "https://kianjain.github.io/shisuka")!
         )
     }
     
