@@ -107,24 +107,19 @@
         console.log('Hash:', window.location.hash);
         console.log('Search:', window.location.search);
 
-        // Get the code and code_verifier from the URL
+        // Get the code from the URL
         const queryParams = new URLSearchParams(window.location.search);
         const code = queryParams.get('code');
-        const codeVerifier = queryParams.get('code_verifier');
-        const type = queryParams.get('type');
 
         console.log('Code:', code);
-        console.log('Code Verifier:', codeVerifier);
-        console.log('Type:', type);
 
-        if (!code || !codeVerifier) {
+        if (!code) {
             document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
             document.getElementById('submitBtn').disabled = true;
         } else {
             // Exchange the code for a session
             console.log('Attempting to exchange code for session...');
             console.log('Code:', code);
-            console.log('Code Verifier:', codeVerifier);
             
             supabase.auth.exchangeCodeForSession(code)
                 .then(({ data, error }) => {
