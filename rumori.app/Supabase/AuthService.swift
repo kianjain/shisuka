@@ -214,17 +214,9 @@ class AuthService: ObservableObject {
     
     @MainActor
     func resetPassword(email: String) async throws {
-        // Generate a random code verifier
-        let codeVerifier = String((0..<43).map { _ in
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~".randomElement()!
-        })
-        
-        // Store the code verifier in UserDefaults
-        UserDefaults.standard.set(codeVerifier, forKey: "code_verifier")
-        
         try await client.auth.resetPasswordForEmail(
             email,
-            redirectTo: URL(string: "https://kianjain.github.io/shisuka/update-password.html?code_verifier=\(codeVerifier)")!
+            redirectTo: URL(string: "https://ktgbpungskpjngopzarg.supabase.co/profile/update")!
         )
     }
     
