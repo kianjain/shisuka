@@ -136,7 +136,9 @@
 
         // Initialize Supabase client
         try {
-            supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+            const { createClient } = supabase;
+            supabaseClient = createClient(supabaseUrl, supabaseKey);
+            console.log('Supabase client initialized successfully');
         } catch (error) {
             console.error('Error initializing Supabase client:', error);
             document.getElementById('error').textContent = 'Error initializing the application. Please try again.';
