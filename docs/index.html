@@ -132,11 +132,11 @@
 
         const supabaseUrl = 'https://qkqgqjqkqkqkqkqk.supabase.co'
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcWdxanFrcWtrcWtrcWtrcWtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk5MjQ0MDAsImV4cCI6MjAyNTUwMDQwMH0.Qkqgqjqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqkqk'
-        let supabase;
+        let supabaseClient;
 
         // Initialize Supabase client
         try {
-            supabase = supabase.createClient(supabaseUrl, supabaseKey);
+            supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
         } catch (error) {
             console.error('Error initializing Supabase client:', error);
             document.getElementById('error').textContent = 'Error initializing the application. Please try again.';
@@ -152,9 +152,9 @@
         if (!code) {
             document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
             document.getElementById('submitBtn').disabled = true;
-        } else if (supabase) {
+        } else if (supabaseClient) {
             // Exchange the code for a session
-            supabase.auth.exchangeCodeForSession(code)
+            supabaseClient.auth.exchangeCodeForSession(code)
                 .then(({ data, error }) => {
                     if (error) {
                         console.error('Error exchanging code:', error);
@@ -173,7 +173,7 @@
         }
 
         async function updatePassword() {
-            if (!supabase) {
+            if (!supabaseClient) {
                 document.getElementById('error').textContent = 'Error: Application not properly initialized. Please try again.';
                 return;
             }
@@ -202,7 +202,7 @@
             submitBtn.textContent = 'Updating...'
 
             try {
-                const { error } = await supabase.auth.updateUser({
+                const { error } = await supabaseClient.auth.updateUser({
                     password: password
                 })
 
