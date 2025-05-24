@@ -100,7 +100,7 @@
     <script>
         const supabaseUrl = 'https://ktgbpungskpjngopzarg.supabase.co'
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0Z2JwdW5nc2twam5nb3B6YXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1ODU1MjgsImV4cCI6MjA1OTE2MTUyOH0.OhnWtlSyX0bUze2mboyA0Mu9wzZt0JuiPNppy0Ph7To'
-        const supabase = supabase.createClient(supabaseUrl, supabaseKey)
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey)
 
         // Debug logging
         console.log('Full URL:', window.location.href);
