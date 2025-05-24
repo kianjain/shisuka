@@ -121,9 +121,7 @@
             console.log('Attempting to exchange code for session...');
             console.log('Code:', code);
             
-            supabase.auth.exchangeCodeForSession({
-                auth_code: code
-            })
+            supabase.auth.exchangeCodeForSession(code)
                 .then(({ data, error }) => {
                     if (error) {
                         console.error('Error exchanging code:', error);
