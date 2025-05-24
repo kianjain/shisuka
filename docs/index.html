@@ -118,20 +118,26 @@
             document.getElementById('submitBtn').disabled = true;
         } else {
             // Exchange the code for a session
+            console.log('Attempting to exchange code for session...');
             supabase.auth.exchangeCodeForSession(code)
                 .then(({ data, error }) => {
                     if (error) {
                         console.error('Error exchanging code:', error);
-                        document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
+                        console.error('Error details:', {
+                            message: error.message,
+                            status: error.status,
+                            name: error.name
+                        });
+                        document.getElementById('error').textContent = `Error: ${error.message}. Please request a new password reset.`;
                         document.getElementById('submitBtn').disabled = true;
                     } else {
-                        console.log('Session established:', data);
+                        console.log('Session established successfully:', data);
                         document.getElementById('submitBtn').disabled = false;
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
+                    console.error('Unexpected error during code exchange:', error);
+                    document.getElementById('error').textContent = `Unexpected error: ${error.message}. Please try again or request a new password reset.`;
                     document.getElementById('submitBtn').disabled = true;
                 });
         }
