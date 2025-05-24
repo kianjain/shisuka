@@ -110,7 +110,7 @@
         // Get the code and code_verifier from the URL
         const queryParams = new URLSearchParams(window.location.search);
         const code = queryParams.get('code');
-        const codeVerifier = localStorage.getItem('code_verifier');
+        const codeVerifier = queryParams.get('code_verifier');
         const type = queryParams.get('type');
 
         console.log('Code:', code);
@@ -134,8 +134,6 @@
                     } else {
                         console.log('Session established successfully:', data);
                         document.getElementById('submitBtn').disabled = false;
-                        // Clear the code verifier after successful exchange
-                        localStorage.removeItem('code_verifier');
                     }
                 })
                 .catch(error => {

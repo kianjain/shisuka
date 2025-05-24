@@ -213,6 +213,24 @@ class AuthService: ObservableObject {
     }
     
     @MainActor
+    func resetPassword(email: String) async throws {
+        // Generate a random code verifier
+        let codeVerifier = String((0..<43).map { _ in
+            let chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
+            return chars[chars.index(chars.startIndex, offsetBy: Int.random(in: 0..<chars.count))]
+        })
+        
+        // Store the code verifier in UserDefaults
+        UserDefaults.standard.set(codeVerifier, forKey: "password_reset_code_verifier")
+        
+        try await client.auth.resetPasswordForEmail(
+            email,
+            redirectTo: "https://kianjain.github.io/shisuka",
+            options: .init(codeVerifier: codeVerifier)
+        )
+    }
+    
+    @MainActor
     private func fetchUserProfile() async {
         guard let userId = currentUser?.id else { 
             print("❌ [Profile] No user ID available for profile fetch")

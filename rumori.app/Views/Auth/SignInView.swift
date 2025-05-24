@@ -42,6 +42,22 @@ struct SignInView: View {
                         .foregroundColor(.white)
                         .tint(.white)
                     
+                    Button("Forgot Password?") {
+                        Task {
+                            do {
+                                try await auth.resetPassword(email: email)
+                                errorMessage = "Password reset instructions have been sent to your email"
+                                showingError = true
+                            } catch {
+                                errorMessage = error.localizedDescription
+                                showingError = true
+                            }
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.horizontal, 4)
+                    
                     Button(action: signIn) {
                         HStack {
                             if auth.isLoading {
