@@ -126,7 +126,10 @@
             console.log('Code:', code);
             console.log('Code Verifier:', codeVerifier);
             
-            supabase.auth.exchangeCodeForSession(code, codeVerifier)
+            supabase.auth.exchangeCodeForSession({
+                code: code,
+                code_verifier: codeVerifier
+            })
                 .then(({ data, error }) => {
                     if (error) {
                         console.error('Error exchanging code:', error);
