@@ -107,13 +107,17 @@
         console.log('Hash:', window.location.hash);
         console.log('Search:', window.location.search);
 
-        // Get the access token from the URL
+        // Try to get the access token from both URL parameters and hash fragment
         const queryParams = new URLSearchParams(window.location.search);
-        const accessToken = queryParams.get('access_token');
-        const refreshToken = queryParams.get('refresh_token');
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        
+        const accessToken = queryParams.get('access_token') || hashParams.get('access_token');
+        const refreshToken = queryParams.get('refresh_token') || hashParams.get('refresh_token');
+        const type = queryParams.get('type');
 
         console.log('Access Token:', accessToken);
         console.log('Refresh Token:', refreshToken);
+        console.log('Type:', type);
 
         if (!accessToken) {
             document.getElementById('error').textContent = 'Invalid or expired reset link. Please request a new password reset.';
