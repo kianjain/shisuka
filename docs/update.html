@@ -106,6 +106,33 @@
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0Z2JwdW5nc2twam5nb3B6YXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1ODU1MjgsImV4cCI6MjA1OTE2MTUyOH0.OhnWtlSyX0bUze2mboyA0Mu9wzZt0JuiPNppy0Ph7To'
         );
 
+        // Get the code from the URL
+        const queryParams = new URLSearchParams(window.location.search);
+        const code = queryParams.get('code');
+
+        if (!code) {
+            showError('Invalid or expired reset link. Please request a new password reset.');
+            document.getElementById('updateButton').disabled = true;
+        } else {
+            // Exchange the code for a session
+            supabase.auth.exchangeCodeForSession(code)
+                .then(({ data, error }) => {
+                    if (error) {
+                        console.error('Error exchanging code:', error);
+                        showError('Invalid or expired reset link. Please request a new password reset.');
+                        document.getElementById('updateButton').disabled = true;
+                    } else {
+                        console.log('Session established successfully');
+                        document.getElementById('updateButton').disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Unexpected error during code exchange:', error);
+                    showError('An unexpected error occurred. Please try again or request a new password reset.');
+                    document.getElementById('updateButton').disabled = true;
+                });
+        }
+
         document.getElementById('updatePasswordForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
