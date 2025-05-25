@@ -7,9 +7,19 @@ class SupabaseManager {
     let client: SupabaseClient
     
     private init() {
+        let config = SupabaseClient.Configuration(
+            auth: .init(
+                autoRefreshToken: true,
+                persistSession: true,
+                detectSessionInUrl: true,
+                flowType: .implicit
+            )
+        )
+        
         self.client = SupabaseClient(
             supabaseURL: URL(string: "https://ktgbpungskpjngopzarg.supabase.co")!,
-            supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0Z2JwdW5nc2twam5nb3B6YXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1ODU1MjgsImV4cCI6MjA1OTE2MTUyOH0.OhnWtlSyX0bUze2mboyA0Mu9wzZt0JuiPNppy0Ph7To"
+            supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0Z2JwdW5nc2twam5nb3B6YXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1ODU1MjgsImV4cCI6MjA1OTE2MTUyOH0.OhnWtlSyX0bUze2mboyA0Mu9wzZt0JuiPNppy0Ph7To",
+            configuration: config
         )
     }
 } 
