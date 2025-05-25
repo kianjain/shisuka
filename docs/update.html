@@ -106,38 +106,53 @@
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0Z2JwdW5nc2twam5nb3B6YXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1ODU1MjgsImV4cCI6MjA1OTE2MTUyOH0.OhnWtlSyX0bUze2mboyA0Mu9wzZt0JuiPNppy0Ph7To'
         );
 
-        // If we're on the root URL with a hash, redirect to update.html
-        if (window.location.pathname === '/' && window.location.hash) {
-            window.location.href = '/shisuka/update.html' + window.location.hash;
-            // Stop execution here as we're redirecting
-            throw new Error('Redirecting...');
-        }
+        // Debug logging
+        console.log('Full URL:', window.location.href);
+        console.log('Hash:', window.location.hash);
+        console.log('Search:', window.location.search);
 
-        // Get the access token from the URL hash
+        // Get the code from either the URL hash or query parameters
         const hash = window.location.hash.substring(1); // Remove the # character
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get('access_token');
-        const type = params.get('type');
+        const searchParams = new URLSearchParams(window.location.search);
+        const code = searchParams.get('code');
+        const hashParams = new URLSearchParams(hash);
+        const accessToken = hashParams.get('access_token');
+        const type = hashParams.get('type');
 
+        console.log('Code:', code);
         console.log('Hash:', hash);
         console.log('Access Token:', accessToken);
         console.log('Type:', type);
 
-        if (!accessToken || type !== 'recovery') {
-            showError('Invalid or expired reset link. Please request a new password reset.');
-            document.getElementById('updateButton').disabled = true;
-        } else {
-            // Set the session using the access token
+        // Handle both hash-based and code-based auth
+        if (code) {
+            // Handle code-based auth (from app)
+            supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+                if (error) {
+                    console.error('Error exchanging code for session:', error);
+                    showError('Invalid or expired reset link. Please request a new password reset.');
+                    document.getElementById('updateButton').disabled = true;
+                } else {
+                    console.log('Session established successfully from code');
+                    document.getElementById('updateButton').disabled = false;
+                }
+            }).catch(error => {
+                console.error('Unexpected error during code exchange:', error);
+                showError('An unexpected error occurred. Please try again or request a new password reset.');
+                document.getElementById('updateButton').disabled = true;
+            });
+        } else if (accessToken && type === 'recovery') {
+            // Handle hash-based auth (from Supabase web)
             supabase.auth.setSession({
                 access_token: accessToken,
-                refresh_token: params.get('refresh_token')
+                refresh_token: hashParams.get('refresh_token')
             }).then(({ data, error }) => {
                 if (error) {
                     console.error('Error setting session:', error);
                     showError('Invalid or expired reset link. Please request a new password reset.');
                     document.getElementById('updateButton').disabled = true;
                 } else {
-                    console.log('Session established successfully');
+                    console.log('Session established successfully from hash');
                     document.getElementById('updateButton').disabled = false;
                 }
             }).catch(error => {
@@ -145,6 +160,9 @@
                 showError('An unexpected error occurred. Please try again or request a new password reset.');
                 document.getElementById('updateButton').disabled = true;
             });
+        } else {
+            showError('Invalid or expired reset link. Please request a new password reset.');
+            document.getElementById('updateButton').disabled = true;
         }
 
         document.getElementById('updatePasswordForm').addEventListener('submit', async (e) => {
