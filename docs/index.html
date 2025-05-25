@@ -78,6 +78,12 @@
             text-align: center;
         }
     </style>
+    <script>
+        // If there's a hash in the URL, redirect to update.html
+        if (window.location.hash) {
+            window.location.href = '/shisuka/update.html' + window.location.hash;
+        }
+    </script>
 </head>
 <body>
     <div class="container">

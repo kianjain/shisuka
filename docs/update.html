@@ -106,6 +106,13 @@
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0Z2JwdW5nc2twam5nb3B6YXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1ODU1MjgsImV4cCI6MjA1OTE2MTUyOH0.OhnWtlSyX0bUze2mboyA0Mu9wzZt0JuiPNppy0Ph7To'
         );
 
+        // If we're on the root URL with a hash, redirect to update.html
+        if (window.location.pathname === '/' && window.location.hash) {
+            window.location.href = '/shisuka/update.html' + window.location.hash;
+            // Stop execution here as we're redirecting
+            throw new Error('Redirecting...');
+        }
+
         // Get the access token from the URL hash
         const hash = window.location.hash.substring(1); // Remove the # character
         const params = new URLSearchParams(hash);
