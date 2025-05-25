@@ -124,38 +124,48 @@
         console.log('Access Token:', accessToken);
         console.log('Type:', type);
 
+        let session = null;
+
         // Handle both hash-based and code-based auth
         if (code) {
             // Handle code-based auth (from app)
-            supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
-                if (error) {
-                    console.error('Error exchanging code for session:', error);
-                    showError('Invalid or expired reset link. Please request a new password reset.');
+            console.log('Attempting to exchange code for session...');
+            supabase.auth.exchangeCodeForSession(code)
+                .then(({ data, error }) => {
+                    if (error) {
+                        console.error('Error exchanging code for session:', error);
+                        showError('Invalid or expired reset link. Please request a new password reset.');
+                        document.getElementById('updateButton').disabled = true;
+                    } else {
+                        console.log('Session established successfully from code:', data);
+                        session = data.session;
+                        document.getElementById('updateButton').disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Unexpected error during code exchange:', error);
+                    showError('An unexpected error occurred. Please try again or request a new password reset.');
                     document.getElementById('updateButton').disabled = true;
-                } else {
-                    console.log('Session established successfully from code');
-                    document.getElementById('updateButton').disabled = false;
-                }
-            }).catch(error => {
-                console.error('Unexpected error during code exchange:', error);
-                showError('An unexpected error occurred. Please try again or request a new password reset.');
-                document.getElementById('updateButton').disabled = true;
-            });
+                });
         } else if (accessToken && type === 'recovery') {
             // Handle hash-based auth (from Supabase web)
+            console.log('Attempting to set session from hash...');
             supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: hashParams.get('refresh_token')
-            }).then(({ data, error }) => {
+            })
+            .then(({ data, error }) => {
                 if (error) {
                     console.error('Error setting session:', error);
                     showError('Invalid or expired reset link. Please request a new password reset.');
                     document.getElementById('updateButton').disabled = true;
                 } else {
-                    console.log('Session established successfully from hash');
+                    console.log('Session established successfully from hash:', data);
+                    session = data.session;
                     document.getElementById('updateButton').disabled = false;
                 }
-            }).catch(error => {
+            })
+            .catch(error => {
                 console.error('Unexpected error during session setup:', error);
                 showError('An unexpected error occurred. Please try again or request a new password reset.');
                 document.getElementById('updateButton').disabled = true;
@@ -181,6 +191,11 @@
             try {
                 updateButton.disabled = true;
                 updateButton.textContent = 'Updating...';
+                
+                // Ensure we have a session before updating password
+                if (!session) {
+                    throw new Error('No active session. Please try the reset link again.');
+                }
                 
                 const { data, error } = await supabase.auth.updateUser({
                     password: password
