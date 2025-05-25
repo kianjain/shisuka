@@ -216,10 +216,7 @@ class AuthService: ObservableObject {
     func resetPassword(email: String) async throws {
         try await client.auth.resetPasswordForEmail(
             email,
-            options: AuthOptions(
-                redirectTo: URL(string: "https://kianjain.github.io/shisuka/update.html")!,
-                shouldCreateUser: false
-            )
+            redirectTo: URL(string: "https://kianjain.github.io/shisuka/update.html")!
         )
     }
     
