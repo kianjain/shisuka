@@ -1,5 +1,6 @@
 import Foundation
 import Supabase
+import Auth
 
 class SupabaseManager {
     static let shared = SupabaseManager()
@@ -8,7 +9,7 @@ class SupabaseManager {
     
     private init() {
         let options = SupabaseClientOptions(
-            auth: AuthOptions(
+            auth: .init(
                 autoRefreshToken: true,
                 persistSession: true,
                 detectSessionInUrl: true,
