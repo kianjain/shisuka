@@ -10,9 +10,6 @@ class SupabaseManager {
     private init() {
         let options = SupabaseClientOptions(
             auth: .init(
-                autoRefreshToken: true,
-                persistSession: true,
-                detectSessionInUrl: true,
                 flowType: .implicit
             )
         )
