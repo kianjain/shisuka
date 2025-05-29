@@ -203,6 +203,8 @@ class AuthService: ObservableObject {
         
         do {
             try await client.auth.signOut()
+            // Reset coin balance before clearing user data
+            await CoinService.shared.reset()
             currentUser = nil
             currentProfile = nil
             isAuthenticated = false
@@ -216,7 +218,7 @@ class AuthService: ObservableObject {
     func resetPassword(email: String) async throws {
         try await client.auth.resetPasswordForEmail(
             email,
-            redirectTo: URL(string: "https://kianjain.github.io/shisuka")!
+            redirectTo: URL(string: "https://shisuka.com/reset-password-page/index.html")!
         )
     }
     
