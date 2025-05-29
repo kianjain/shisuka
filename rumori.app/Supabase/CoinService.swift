@@ -9,11 +9,25 @@ class CoinService: ObservableObject {
     @Published var isLoading: Bool = true
     
     private init() {
+        // Initial balance fetch
         Task { @MainActor in
             do {
                 try await fetchBalance()
             } catch {
                 print("❌ [CoinService] Error fetching initial balance: \(error)")
+            }
+        }
+    }
+    
+    @MainActor
+    func reset() async {
+        balance = 0
+        isLoading = true
+        if let userId = AuthService.shared.currentUser?.id {
+            do {
+                try await fetchBalance()
+            } catch {
+                print("❌ [CoinService] Error fetching balance after reset: \(error)")
             }
         }
     }
