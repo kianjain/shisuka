@@ -54,7 +54,8 @@ struct SignInView: View {
                             }
                         }
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.white.opacity(0.6))
+                    .font(.system(size: 14))
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.horizontal, 4)
                     
@@ -93,7 +94,7 @@ struct SignInView: View {
             .sheet(isPresented: $showingSignUp) {
                 SignUpView()
             }
-            .alert("Error", isPresented: $showingError) {
+            .alert(showingError && errorMessage.contains("Password reset instructions") ? "Success" : "Error", isPresented: $showingError) {
                 Button("OK") {}
             } message: {
                 Text(errorMessage)
