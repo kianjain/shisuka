@@ -122,9 +122,7 @@ class AuthService: ObservableObject {
                 email: email,
                 password: password,
                 data: ["username": AnyJSON.string(username)],
-                options: AuthSignUpOptions(
-                    redirectTo: URL(string: "https://verify.shisuka.com/verification-complete.html")
-                )
+                redirectTo: URL(string: "https://verify.shisuka.com/verification-complete.html")
             )
             print("Sign up successful: \(session.user.id)")
             
