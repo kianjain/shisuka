@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Verification Complete</title>
-  <meta name="viewport" content="width=1100">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       background: #000;
@@ -16,21 +16,23 @@
       font-family: 'Inter', Arial, sans-serif;
     }
     .verification-container {
-      width: 1100px;
+      width: 100%;
+      max-width: 420px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       overflow: hidden;
-      padding: 0;
-      gap: 32px;
+      padding: 32px 16px;
+      gap: 28px;
       position: relative;
       border-radius: 10px;
-      background: transparent;
+      background: #111;
+      box-sizing: border-box;
     }
     .verification-title {
       color: #fff;
-      font-size: 48px;
+      font-size: 2.1rem;
       font-weight: 500;
       margin: 0;
       text-align: center;
@@ -38,11 +40,11 @@
     }
     .verification-subtext {
       color: #bdbdbd;
-      font-size: 22px;
+      font-size: 1.1rem;
       font-weight: 400;
       text-align: center;
       margin: 0;
-      line-height: 1.3;
+      line-height: 1.4;
       letter-spacing: 0.01em;
     }
     .verification-button {
@@ -50,27 +52,53 @@
       color: #000;
       border: none;
       border-radius: 32px;
-      padding: 14px 36px;
-      font-size: 18px;
+      padding: 16px 0;
+      font-size: 1.1rem;
       font-weight: 400;
       cursor: pointer;
       transition: background 0.2s;
       box-shadow: 0 2px 8px rgba(0,0,0,0.03);
       text-decoration: none;
-      display: inline-block;
+      display: block;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
     }
     .verification-button:hover {
       background: #f0f0f0;
     }
-    @media (max-width: 1200px) {
+    @media (min-width: 600px) {
       .verification-container {
-        width: 95vw;
+        max-width: 520px;
+        padding: 48px 32px;
+        gap: 32px;
       }
       .verification-title {
-        font-size: 6vw;
+        font-size: 2.6rem;
       }
       .verification-subtext {
-        font-size: 2.2vw;
+        font-size: 1.25rem;
+      }
+      .verification-button {
+        font-size: 1.2rem;
+        max-width: 340px;
+      }
+    }
+    @media (min-width: 900px) {
+      .verification-container {
+        max-width: 600px;
+        padding: 56px 40px;
+        gap: 36px;
+      }
+      .verification-title {
+        font-size: 2.9rem;
+      }
+      .verification-subtext {
+        font-size: 1.35rem;
+      }
+      .verification-button {
+        font-size: 1.25rem;
+        max-width: 360px;
       }
     }
   </style>
