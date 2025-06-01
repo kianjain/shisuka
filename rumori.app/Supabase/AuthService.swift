@@ -121,7 +121,10 @@ class AuthService: ObservableObject {
             let session = try await client.auth.signUp(
                 email: email,
                 password: password,
-                data: ["username": AnyJSON.string(username)]
+                data: ["username": AnyJSON.string(username)],
+                options: AuthSignUpOptions(
+                    redirectTo: URL(string: "https://verify.shisuka.com/verification-complete.html")
+                )
             )
             print("Sign up successful: \(session.user.id)")
             
