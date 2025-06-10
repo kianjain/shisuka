@@ -14,7 +14,27 @@ struct ProjectCard: View {
             HStack(spacing: 16) {
                 // Square Project Image
                 Group {
-                    if let imageUrl = project.imageUrl {
+                    if project.type.lowercased() == "idea" {
+                        ZStack {
+                            Rectangle()
+                                .fill(Color.black.opacity(0.8))
+                                .frame(width: 80, height: 80)
+                            
+                            // Glow effect
+                            Circle()
+                                .fill(Color.yellow.opacity(0.2))
+                                .frame(width: 60, height: 60)
+                                .blur(radius: 10)
+                                .offset(y: 5)
+                            
+                            // Lightbulb icon
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(.yellow)
+                                .shadow(color: .yellow.opacity(0.5), radius: 10, x: 0, y: 0)
+                        }
+                        .cornerRadius(12)
+                    } else if let imageUrl = project.imageUrl {
                         AsyncImage(url: imageUrl) { phase in
                             switch phase {
                             case .empty:
@@ -40,8 +60,18 @@ struct ProjectCard: View {
                                             .font(.title2)
                                             .foregroundColor(.white.opacity(0.5))
                                     )
+                            @unknown default:
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 80, height: 80)
+                                    .overlay(
+                                        Image(systemName: getFileTypeIcon(for: project.fileType))
+                                            .font(.title2)
+                                            .foregroundColor(.white.opacity(0.5))
+                                    )
                             }
                         }
+                        .cornerRadius(12)
                     } else {
                         Rectangle()
                             .fill(Color.gray.opacity(0.3))
@@ -51,6 +81,7 @@ struct ProjectCard: View {
                                     .font(.title2)
                                     .foregroundColor(.white.opacity(0.5))
                             )
+                            .cornerRadius(12)
                     }
                 }
                 .cornerRadius(10)
@@ -195,7 +226,7 @@ struct LibraryView: View {
     @State private var showingProfile = false
     @State private var selectedTab: Int = 1
     
-    private let filters = ["All", "Audio", "Image", "Active", "Completed", "Archived"]
+    private let filters = ["All", "Audio", "Image", "Archived"]
     
     var filteredProjects: [ProjectPreview] {
         var filtered = projects
@@ -212,7 +243,8 @@ struct LibraryView: View {
         if selectedFilter == "All" { return filtered }
         if selectedFilter == "Audio" { return filtered.filter { $0.fileType == "Audio" } }
         if selectedFilter == "Image" { return filtered.filter { $0.fileType == "Images" } }
-        return filtered.filter { $0.status.rawValue == selectedFilter }
+        if selectedFilter == "Archived" { return filtered.filter { $0.status == .archived } }
+        return filtered
     }
     
     var body: some View {
@@ -455,7 +487,8 @@ struct LibraryView: View {
                         likes: 0,
                         isOwnedByUser: true,
                         lastStatusUpdate: project.updatedAt,
-                        hasUnreadFeedback: feedback.contains { $0.seenAt == nil }
+                        hasUnreadFeedback: feedback.contains { $0.seenAt == nil },
+                        type: project.audioPath != nil ? "audio" : "photo"
                     )
                     
                     newProjects.append(projectPreview)

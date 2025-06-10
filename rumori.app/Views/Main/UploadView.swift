@@ -5,6 +5,7 @@ import Supabase
 enum UploadType {
     case photo
     case audio
+    case idea
 }
 
 struct InputField: View {
@@ -107,25 +108,50 @@ struct FileTypeButton: View {
     let systemName: String
     let title: String
     let action: () -> Void
+    let isSelected: Bool
+    let isAnySelected: Bool
     
     var body: some View {
         Button(action: action) {
-            HStack {
+            VStack(spacing: 8) {
                 Image(systemName: systemName)
-                    .font(.title2)
+                    .font(.system(size: 32))
                 Text(title)
-                    .lineLimit(1)
-                Spacer()
+                    .font(.caption)
             }
-            .padding(12)
-            .background(Color(.systemGray6))
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 100)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(.systemGray6).opacity(0.8),
+                        Color(.systemGray5).opacity(0.6)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1.5)
+                    .strokeBorder(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.white.opacity(0.5),
+                                Color.white.opacity(0.2)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.5
+                    )
             )
+            .shadow(color: Color.white.opacity(0.2), radius: 8, x: -2, y: -2)
+            .shadow(color: Color.black.opacity(0.2), radius: 8, x: 2, y: 2)
         }
-        .foregroundColor(.white)
+        .opacity(isAnySelected ? (isSelected ? 1 : 0) : 1)
+        .scaleEffect(isAnySelected ? (isSelected ? 1 : 0.8) : 1)
     }
 }
 
@@ -135,10 +161,22 @@ struct FilePreviewView: View {
     let selectedUploadType: UploadType?
     let showingImagePicker: Bool
     let onAddCoverImage: () -> Void
+    let originalFileName: String?
     
     var body: some View {
         VStack {
-            if let imageData = imageData, let uiImage = UIImage(data: imageData) {
+            if selectedUploadType == .idea {
+                VStack {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 64))
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                .padding(.top, 8)
+            } else if let imageData = imageData, let uiImage = UIImage(data: imageData) {
                 VStack {
                     Image(uiImage: uiImage)
                         .resizable()
@@ -149,14 +187,6 @@ struct FilePreviewView: View {
                 .background(Color(.systemGray6))
                 .cornerRadius(8)
                 .padding(.top, 8)
-            }
-            
-            if let audioURL = audioURL {
-                Text("Selected: \(audioURL.lastPathComponent)")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-                    .padding(.top, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             
             if selectedUploadType == .audio && imageData == nil {
@@ -178,6 +208,14 @@ struct FilePreviewView: View {
                 }
                 .foregroundColor(.white)
                 .padding(.top, 8)
+            }
+            
+            if let fileName = originalFileName {
+                Text(fileName)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -201,54 +239,76 @@ struct FileSelectionView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Project File")
-                .font(.headline)
-                .foregroundColor(.white)
-            
             if selectedUploadType == nil {
-                HStack(spacing: 12) {
-                    FileTypeButton(systemName: "photo", title: "Photo Library") {
-                        selectedUploadType = .photo
-                        showingImagePicker = true
-                    }
-                    
-                    FileTypeButton(systemName: "music.note", title: "Audio File") {
-                        selectedUploadType = .audio
-                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                           let window = windowScene.windows.first {
-                            let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio])
-                            picker.delegate = viewModel
-                            window.rootViewController?.present(picker, animated: true)
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 16) {
+                    FileTypeButton(systemName: "photo", title: "Photo", action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            selectedUploadType = .photo
+                            showingImagePicker = true
                         }
-                    }
+                    }, isSelected: selectedUploadType == .photo, isAnySelected: selectedUploadType != nil)
+                    
+                    FileTypeButton(systemName: "music.note", title: "Audio", action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            selectedUploadType = .audio
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let window = windowScene.windows.first {
+                                let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio])
+                                picker.delegate = viewModel
+                                window.rootViewController?.present(picker, animated: true)
+                            }
+                        }
+                    }, isSelected: selectedUploadType == .audio, isAnySelected: selectedUploadType != nil)
+                    
+                    FileTypeButton(systemName: "lightbulb", title: "Idea", action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            selectedUploadType = .idea
+                        }
+                    }, isSelected: selectedUploadType == .idea, isAnySelected: selectedUploadType != nil)
                 }
+            } else {
+                // Transform the selected button into a cancel button
+                FileTypeButton(
+                    systemName: "xmark",
+                    title: "Cancel",
+                    action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            // Reset all state variables
+                            selectedUploadType = nil
+                            selectedImage = nil
+                            imageData = nil
+                            selectedAudio = nil
+                            audioData = nil
+                            projectName = ""
+                            projectDescription = ""
+                            isUploading = false
+                            showError = false
+                            errorMessage = nil
+                            selectedAudioURL = nil
+                            viewModel.originalFileName = nil
+                        }
+                    },
+                    isSelected: true,
+                    isAnySelected: true
+                )
+                .transition(.scale.combined(with: .opacity))
             }
             
-            if selectedUploadType != nil {
-                FileTypeButton(systemName: "xmark.circle", title: "Cancel") {
-                    // Reset all state variables
-                    selectedUploadType = nil
-                    selectedImage = nil
-                    imageData = nil
-                    selectedAudio = nil
-                    audioData = nil
-                    projectName = ""
-                    projectDescription = ""
-                    isUploading = false
-                    showError = false
-                    errorMessage = nil
-                    selectedAudioURL = nil
-                }
-                .padding(.top, 8)
+            if selectedUploadType != .idea {
+                FilePreviewView(
+                    imageData: imageData,
+                    audioURL: selectedAudio,
+                    selectedUploadType: selectedUploadType,
+                    showingImagePicker: showingImagePicker,
+                    onAddCoverImage: { showingImagePicker = true },
+                    originalFileName: viewModel.originalFileName
+                )
+                .transition(.opacity)
             }
-            
-            FilePreviewView(
-                imageData: imageData,
-                audioURL: selectedAudio,
-                selectedUploadType: selectedUploadType,
-                showingImagePicker: showingImagePicker,
-                onAddCoverImage: { showingImagePicker = true }
-            )
         }
     }
 }
@@ -475,7 +535,8 @@ struct UploadContentView: View {
                     title: projectName,
                     description: projectDescription.isEmpty ? nil : projectDescription,
                     imageData: viewModel.imageData,
-                    audioData: viewModel.audioData
+                    audioData: viewModel.audioData,
+                    type: selectedUploadType ?? .photo
                 )
                 
                 // Reset form
@@ -485,6 +546,7 @@ struct UploadContentView: View {
                 viewModel.audioData = nil
                 selectedImage = nil
                 selectedAudio = nil
+                selectedUploadType = nil
                 
                 // Show success message
                 showSuccess = true
@@ -603,7 +665,8 @@ struct UploadView: View {
                     title: projectName,
                     description: projectDescription.isEmpty ? nil : projectDescription,
                     imageData: viewModel.imageData,
-                    audioData: viewModel.audioData
+                    audioData: viewModel.audioData,
+                    type: selectedUploadType ?? .photo
                 )
                 
                 // Reset form
@@ -613,6 +676,7 @@ struct UploadView: View {
                 viewModel.audioData = nil
                 selectedImage = nil
                 selectedAudio = nil
+                selectedUploadType = nil
                 
                 // Show success message
                 showSuccess = true
@@ -642,6 +706,7 @@ class UploadViewModel: NSObject, ObservableObject, UIDocumentPickerDelegate {
     @Published var showError: Bool = false
     @Published var imageData: Data?
     @Published var showingAudioCropper: Bool = false
+    @Published var originalFileName: String?
     
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         print("📁 Document picker selected files: \(urls)")
@@ -652,6 +717,7 @@ class UploadViewModel: NSObject, ObservableObject, UIDocumentPickerDelegate {
         print("✅ Selected audio URL: \(url)")
         print("📱 Current selectedAudioURL state: \(String(describing: selectedAudioURL))")
         selectedAudioURL = url
+        originalFileName = url.lastPathComponent
         print("📱 New selectedAudioURL state: \(String(describing: selectedAudioURL))")
         showingAudioCropper = true
     }

@@ -163,7 +163,8 @@ struct ProfileView: View {
                     likes: 0,
                     isOwnedByUser: project.userId == userId,
                     lastStatusUpdate: project.updatedAt,
-                    hasUnreadFeedback: false
+                    hasUnreadFeedback: false,
+                    type: project.audioPath != nil ? "audio" : "photo"
                 )
                 projects.append(preview)
             }
@@ -336,7 +337,7 @@ struct ProfileView: View {
                             .padding()
                         } else if favoriteProjects.isEmpty {
                             VStack(spacing: 8) {
-                                Image(systemName: "star")
+                                Image(systemName: "heart")
                                     .font(.system(size: 32))
                                     .foregroundColor(.gray)
                                 Text("No favorites yet")

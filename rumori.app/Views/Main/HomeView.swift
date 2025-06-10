@@ -55,14 +55,46 @@ struct FeaturedProjectCard: View {
         NavigationLink(destination: ProjectView(projectId: project.id.uuidString)) {
             HStack(spacing: 16) {
                 // Square Project Image
-                if let imageUrl = project.imageUrl {
-                    AsyncImage(url: imageUrl) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 80, height: 80)
-                            .clipped()
-                    } placeholder: {
+                Group {
+                    if project.type.lowercased() == "idea" {
+                        ZStack {
+                            Rectangle()
+                                .fill(Color.black.opacity(0.8))
+                                .frame(width: 80, height: 80)
+                            
+                            // Glow effect
+                            Circle()
+                                .fill(Color.yellow.opacity(0.2))
+                                .frame(width: 60, height: 60)
+                                .blur(radius: 10)
+                                .offset(y: 5)
+                            
+                            // Lightbulb icon
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(.yellow)
+                                .shadow(color: .yellow.opacity(0.5), radius: 10, x: 0, y: 0)
+                        }
+                        .cornerRadius(12)
+                    } else if let imageUrl = project.imageUrl {
+                        AsyncImage(url: imageUrl) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 80, height: 80)
+                                .clipped()
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 80, height: 80)
+                                .overlay(
+                                    Image(systemName: getFileTypeIcon(for: project.fileType))
+                                        .font(.title2)
+                                        .foregroundColor(.white.opacity(0.5))
+                                )
+                        }
+                        .cornerRadius(12)
+                    } else {
                         Rectangle()
                             .fill(Color.gray.opacity(0.3))
                             .frame(width: 80, height: 80)
@@ -71,18 +103,8 @@ struct FeaturedProjectCard: View {
                                     .font(.title2)
                                     .foregroundColor(.white.opacity(0.5))
                             )
+                            .cornerRadius(12)
                     }
-                    .cornerRadius(12)
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 80, height: 80)
-                        .overlay(
-                            Image(systemName: getFileTypeIcon(for: project.fileType))
-                                .font(.title2)
-                                .foregroundColor(.white.opacity(0.5))
-                        )
-                        .cornerRadius(12)
                 }
                 
                 // Project Info
@@ -412,130 +434,15 @@ struct HomeView: View {
     @State private var notificationsError: Error?
     
     // Favorites data
-    private let favoriteItems = [
-        MinimalisticCardItem(
-            id: "Summer Beat",
-            name: "Summer Beat",
-            subtitle: "🎵",
-            description: "A fresh electronic track with tropical vibes",
-            imageUrl: URL(string: "https://example.com/summer-beat-cover.jpg"),
-            type: "Audio"
-        ),
-        MinimalisticCardItem(
-            id: "Portrait Series",
-            name: "Portrait Series",
-            subtitle: "📸",
-            description: "A collection of street photography shots",
-            imageUrl: URL(string: "https://example.com/portrait-series-cover.jpg"),
-            type: "Images"
-        ),
-        MinimalisticCardItem(
-            id: "Urban Soundscape",
-            name: "Urban Soundscape",
-            subtitle: "🎧",
-            description: "Field recordings from city streets",
-            imageUrl: URL(string: "https://example.com/urban-soundscape-cover.jpg"),
-            type: "Audio"
-        )
-    ]
+    private let favoriteItems: [MinimalisticCardItem] = []
     
     // Notifications data
-    private let notificationItems = [
-        MinimalisticCardItem(
-            id: "New Feedback",
-            name: "New Feedback",
-            subtitle: "2h ago",
-            description: "John commented on 'Summer Beat'",
-            imageUrl: nil,
-            type: "comment"
-        ),
-        MinimalisticCardItem(
-            id: "Project Completed",
-            name: "Project Completed",
-            subtitle: "1d ago",
-            description: "Portrait Series is now live",
-            imageUrl: nil,
-            type: "checkmark.circle"
-        ),
-        MinimalisticCardItem(
-            id: "New Followers",
-            name: "New Followers",
-            subtitle: "2d ago",
-            description: "You gained 3 new followers",
-            imageUrl: nil,
-            type: "person.2"
-        )
-    ]
+    private let notificationItems: [MinimalisticCardItem] = []
     
     // Recent Projects data
-    private let recentProjectItems = [
-        MinimalisticCardItem(
-            id: "Urban Soundscape",
-            name: "Urban Soundscape",
-            subtitle: "2 days ago",
-            description: "A collection of field recordings capturing the unique sounds of city life, from bustling streets to quiet alleyways.",
-            imageUrl: URL(string: "https://example.com/urban-soundscape-cover.jpg"),
-            type: "Audio"
-        ),
-        MinimalisticCardItem(
-            id: "Portrait Series",
-            name: "Portrait Series",
-            subtitle: "5 days ago",
-            description: "A series of street portraits exploring human emotions and connections in urban environments.",
-            imageUrl: URL(string: "https://example.com/portrait-series-cover.jpg"),
-            type: "Images"
-        ),
-        MinimalisticCardItem(
-            id: "Summer Beat",
-            name: "Summer Beat",
-            subtitle: "1 week ago",
-            description: "An upbeat electronic track blending tropical elements with modern production techniques.",
-            imageUrl: URL(string: "https://example.com/summer-beat-cover.jpg"),
-            type: "Audio"
-        )
-    ]
+    private let recentProjectItems: [MinimalisticCardItem] = []
     
-    private let featuredProjects = [
-        ProjectPreview(
-            id: UUID(),
-            name: "Summer Beat",
-            description: "A fresh electronic track with tropical vibes. Looking for feedback on the mix and arrangement.",
-            fileType: "Audio",
-            author: "MusicMaker",
-            imageUrl: URL(string: "https://example.com/summer-beat-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-7*24*3600),
-            status: .active,
-            feedback: [],
-            rumorsSpent: 0,
-            likes: 12,
-            isOwnedByUser: false,
-            lastStatusUpdate: nil,
-            hasUnreadFeedback: false
-        ),
-        ProjectPreview(
-            id: UUID(),
-            name: "Portrait Series",
-            description: "A collection of street photography shots. Need feedback on composition and editing.",
-            fileType: "Images",
-            author: "PhotoArtist",
-            imageUrl: URL(string: "https://example.com/portrait-series-cover.jpg"),
-            uploadDate: Date().addingTimeInterval(-14*24*3600),
-            status: .completed,
-            feedback: [
-                Feedback(
-                    id: UUID(),
-                    author: "PhotoCritic",
-                    comment: "The composition is excellent, especially in the urban environment shots. The contrast could be slightly increased in some images.",
-                    date: Date().addingTimeInterval(-5*24*3600)
-                )
-            ],
-            rumorsSpent: 0,
-            likes: 8,
-            isOwnedByUser: true,
-            lastStatusUpdate: nil,
-            hasUnreadFeedback: false
-        )
-    ]
+    private let featuredProjects: [ProjectPreview] = []
     
     var body: some View {
         NavigationStack {
@@ -1067,7 +974,8 @@ struct HomeView: View {
                         likes: 0,
                         isOwnedByUser: false,
                         lastStatusUpdate: project.updatedAt,
-                        hasUnreadFeedback: false
+                        hasUnreadFeedback: false,
+                        type: fileType.lowercased()
                     )
                     projectPreviews.append(preview)
                 }
@@ -1111,7 +1019,8 @@ struct HomeView: View {
                         likes: 0,
                         isOwnedByUser: true,
                         lastStatusUpdate: project.updatedAt,
-                        hasUnreadFeedback: false
+                        hasUnreadFeedback: false,
+                        type: project.audioPath != nil ? "audio" : "photo"
                     )
                     projectPreviews.append(preview)
                 }

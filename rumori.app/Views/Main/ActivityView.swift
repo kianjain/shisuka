@@ -140,6 +140,7 @@ struct ActivityView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
                         VStack(spacing: 32) {

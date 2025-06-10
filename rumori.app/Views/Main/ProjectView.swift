@@ -6,6 +6,7 @@ import Supabase
 // MARK: - Project Image View
 private struct ProjectImageView: View {
     let imageURL: URL?
+    let fileType: String
     
     var body: some View {
         Group {
@@ -27,15 +28,68 @@ private struct ProjectImageView: View {
     }
     
     private var placeholderView: some View {
-        Rectangle()
-            .fill(Color.gray.opacity(0.3))
-            .frame(maxWidth: .infinity)
-            .aspectRatio(16/9, contentMode: .fit)
-            .overlay(
-                Image(systemName: "photo")
-                    .font(.system(size: 40))
-                    .foregroundColor(.white.opacity(0.5))
-            )
+        Group {
+            if fileType.lowercased() == "idea" {
+                ZStack {
+                    // Darkened background
+                    Rectangle()
+                        .fill(Color.black.opacity(0.8))
+                        .frame(maxWidth: .infinity)
+                        .aspectRatio(16/9, contentMode: .fit)
+                    
+                    // Glow effect
+                    Circle()
+                        .fill(Color.yellow.opacity(0.2))
+                        .frame(width: 200, height: 200)
+                        .blur(radius: 30)
+                        .offset(y: 20)
+                    
+                    // Lightbulb icon
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.yellow)
+                        .shadow(color: .yellow.opacity(0.5), radius: 20, x: 0, y: 0)
+                }
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white.opacity(0.5))
+                    )
+            }
+        }
+    }
+}
+
+// MARK: - Idea Project Image View
+private struct IdeaProjectImageView: View {
+    var body: some View {
+        ZStack {
+            // Darkened background
+            Rectangle()
+                .fill(Color.black.opacity(0.8))
+                .frame(maxWidth: .infinity)
+                .aspectRatio(16/9, contentMode: .fit)
+            
+            // Glow effect
+            Circle()
+                .fill(Color.yellow.opacity(0.2))
+                .frame(width: 200, height: 200)
+                .blur(radius: 30)
+                .offset(y: 20)
+            
+            // Lightbulb icon
+            Image(systemName: "lightbulb.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.yellow)
+                .shadow(color: .yellow.opacity(0.5), radius: 20, x: 0, y: 0)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal)
     }
 }
 
@@ -519,9 +573,9 @@ struct ProjectView: View {
                             let storage = SupabaseManager.shared.client.storage.from("project_files")
                             if let imagePath = project.imagePath,
                                let imageURL = try? storage.getPublicURL(path: imagePath) {
-                                ProjectImageView(imageURL: imageURL)
+                                ProjectImageView(imageURL: imageURL, fileType: project.fileType)
                             } else {
-                                ProjectImageView(imageURL: nil)
+                                ProjectImageView(imageURL: nil, fileType: project.fileType)
                             }
                             
                             ProjectInfoView(

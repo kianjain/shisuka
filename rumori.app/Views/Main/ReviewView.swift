@@ -269,7 +269,8 @@ struct ReviewView: View {
                         likes: 0,
                         isOwnedByUser: false,
                         lastStatusUpdate: project.updatedAt,
-                        hasUnreadFeedback: false
+                        hasUnreadFeedback: false,
+                        type: fileType.lowercased()
                     )
                     projectPreviews.append(preview)
                 }

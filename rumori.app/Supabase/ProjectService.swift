@@ -66,7 +66,7 @@ class ProjectService: ObservableObject {
     }
     
     @MainActor
-    func createProject(title: String, description: String?, imageData: Data?, audioData: Data?) async throws -> Project {
+    func createProject(title: String, description: String?, imageData: Data?, audioData: Data?, type: UploadType = .photo) async throws -> Project {
         guard let userId = AuthService.shared.currentUser?.id else {
             throw AuthError.notAuthenticated
         }
@@ -76,8 +76,8 @@ class ProjectService: ObservableObject {
         var audioFilePath: String?
         
         do {
-            // Upload the image if provided
-            if let imageData = imageData {
+            // Upload the image if provided and not an idea
+            if type != .idea, let imageData = imageData {
                 // Compress the image before uploading
                 guard let compressedImageData = compressImage(imageData, targetSize: CGSize(width: 500, height: 500)) else {
                     throw NSError(domain: "ProjectService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to compress image"])
@@ -90,8 +90,8 @@ class ProjectService: ObservableObject {
                 print("✅ Image uploaded successfully")
             }
             
-            // Upload audio if provided
-            if let audioData = audioData {
+            // Upload audio if provided and not an idea
+            if type != .idea, let audioData = audioData {
                 // Compress the audio before uploading
                 guard let compressedAudioData = compressAudio(audioData) else {
                     throw NSError(domain: "ProjectService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Audio file is too large. Maximum size is 5MB."])
@@ -109,72 +109,43 @@ class ProjectService: ObservableObject {
                 let user_id: UUID
                 let title: String
                 let description: String?
-                let image_path: String?
+                let image_path: String
                 let audio_path: String?
                 let created_at: String
                 let updated_at: String
                 let status: String
+                let file_type: String
             }
             
+            let now = ISO8601DateFormatter().string(from: Date())
             let projectData = ProjectData(
                 user_id: userId,
                 title: title,
                 description: description,
-                image_path: imageFilePath,
+                image_path: imageFilePath ?? "",
                 audio_path: audioFilePath,
-                created_at: ISO8601DateFormatter().string(from: Date()),
-                updated_at: ISO8601DateFormatter().string(from: Date()),
-                status: ProjectStatus.active.rawValue
+                created_at: now,
+                updated_at: now,
+                status: "active",
+                file_type: type == .idea ? "idea" : (audioFilePath != nil ? "audio" : "photo")
             )
             
-            print("📝 Creating project record with data: \(projectData)")
-            
-            let response = try await client
+            let response = try await client.database
                 .from("projects")
                 .insert(projectData)
-                .select()
-                .single()
                 .execute()
-            
-            print("📝 Raw response data: \(String(data: response.data, encoding: .utf8) ?? "nil")")
             
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             
-            let project = try decoder.decode(Project.self, from: response.data)
-            print("✅ Project created successfully: \(project.title), status: \(project.status.rawValue)")
-            
-            // Now that we have the project ID, try to spend the coin
-            do {
-                try await CoinService.shared.spendCoins(
-                    amount: 1,
-                    projectId: project.id,
-                    description: "Spent to create a new project"
-                )
-                print("✅ Coin spent successfully for project creation")
-            } catch let error as PostgrestError {
-                print("❌ [Project] Failed to spend coin - PostgrestError: \(error.message)")
-                // Don't throw the error since the project was created successfully
-            } catch {
-                print("❌ [Project] Failed to spend coin - Error: \(error)")
-                // Don't throw the error since the project was created successfully
+            if let projects = try? decoder.decode([Project].self, from: response.data),
+               let project = projects.first {
+                return project
             }
             
-            return project
-            
+            throw NSError(domain: "ProjectService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to decode project response"])
         } catch {
-            print("❌ [Project] Error uploading project: \(error)")
-            // If we uploaded files but failed to create the project, try to clean up
-            if let imagePath = imageFilePath {
-                _ = try? await client.storage
-                    .from("project_files")
-                    .remove(paths: [imagePath])
-            }
-            if let audioPath = audioFilePath {
-                _ = try? await client.storage
-                    .from("project_files")
-                    .remove(paths: [audioPath])
-            }
+            print("❌ [Project] Error creating project: \(error)")
             throw error
         }
     }

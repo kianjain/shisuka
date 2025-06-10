@@ -68,6 +68,7 @@ struct Project: Identifiable, Codable {
     let createdAt: Date
     let updatedAt: Date
     var status: ProjectStatus = .active
+    var fileType: String
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -79,9 +80,10 @@ struct Project: Identifiable, Codable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case status
+        case fileType = "file_type"
     }
     
-    init(id: UUID, userId: UUID, title: String, description: String?, imagePath: String?, audioPath: String?, createdAt: Date, updatedAt: Date, status: ProjectStatus = .active) {
+    init(id: UUID, userId: UUID, title: String, description: String?, imagePath: String?, audioPath: String?, createdAt: Date, updatedAt: Date, status: ProjectStatus = .active, fileType: String? = nil) {
         self.id = id
         self.userId = userId
         self.title = title
@@ -91,6 +93,7 @@ struct Project: Identifiable, Codable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.status = status
+        self.fileType = fileType ?? (audioPath != nil ? "audio" : (imagePath != nil ? "photo" : "idea"))
     }
     
     init(from decoder: Decoder) throws {
@@ -102,6 +105,7 @@ struct Project: Identifiable, Codable {
         imagePath = try container.decodeIfPresent(String.self, forKey: .imagePath)
         audioPath = try container.decodeIfPresent(String.self, forKey: .audioPath)
         status = try container.decodeIfPresent(ProjectStatus.self, forKey: .status) ?? .active
+        fileType = try container.decodeIfPresent(String.self, forKey: .fileType) ?? (audioPath != nil ? "audio" : (imagePath != nil ? "photo" : "idea"))
         
         // Custom date decoding with multiple formatters
         let dateFormatter = ISO8601DateFormatter()
@@ -138,6 +142,25 @@ struct ProjectPreview: Identifiable, Codable {
     let isOwnedByUser: Bool
     let lastStatusUpdate: Date?
     var hasUnreadFeedback: Bool
+    let type: String
+    
+    init(id: UUID, name: String, description: String, fileType: String, author: String, imageUrl: URL?, uploadDate: Date, status: ProjectStatus, feedback: [Feedback], rumorsSpent: Int, likes: Int, isOwnedByUser: Bool, lastStatusUpdate: Date?, hasUnreadFeedback: Bool, type: String? = nil) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.fileType = fileType
+        self.author = author
+        self.imageUrl = imageUrl
+        self.uploadDate = uploadDate
+        self.status = status
+        self.feedback = feedback
+        self.rumorsSpent = rumorsSpent
+        self.likes = likes
+        self.isOwnedByUser = isOwnedByUser
+        self.lastStatusUpdate = lastStatusUpdate
+        self.hasUnreadFeedback = hasUnreadFeedback
+        self.type = type ?? fileType.lowercased()
+    }
     
     /// Returns true if the project can be transitioned to the given status
     func canTransition(to newStatus: ProjectStatus) -> Bool {
